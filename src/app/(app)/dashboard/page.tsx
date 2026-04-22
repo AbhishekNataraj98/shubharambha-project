@@ -208,99 +208,154 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-24">
-      <div className="mx-auto w-full max-w-md px-4 py-5">
-        <header className="flex items-center justify-between">
+    <div className="min-h-screen pb-24" style={{ backgroundColor: '#FAFAFA' }}>
+      {/* Gradient Header */}
+      <div
+        style={{
+          background: 'linear-gradient(to right, #E8590C, #C44A0A)',
+        }}
+        className="px-4 py-6 text-white"
+      >
+        <div className="mx-auto flex w-full max-w-md items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#E8590C] text-base font-bold text-white">
-              S
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white bg-opacity-20">
+              <span className="text-lg font-bold">S</span>
             </div>
-            <span className="text-lg font-semibold text-gray-900">Shubharambha</span>
+            <span className="text-lg font-bold">Shubharambha</span>
           </div>
 
           <AvatarMenu initials={initialsFromName(profile.name)} />
-        </header>
+        </div>
+      </div>
 
-        <section className="mt-6">
-          <h1 className="text-2xl font-bold text-gray-900">
+      <div className="mx-auto w-full max-w-md px-4 py-6">
+        {/* Greeting Card */}
+        <section className="mb-6 rounded-xl bg-white p-5 shadow-sm">
+          <h1 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
             {getGreeting()}, {profile.name}
           </h1>
-          <div className="mt-2 inline-flex rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-[#E8590C]">
-            {profile.role}
+          <div className="mt-3 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold" style={{ backgroundColor: '#FFF8F5', color: '#E8590C' }}>
+            {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
           </div>
         </section>
 
+        {/* Stat Cards */}
         {(profile.role === 'customer' || profile.role === 'contractor') && (
-          <section className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-xs text-gray-500">Active Projects</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{activeProjectsCount}</p>
+          <section className="mb-6 grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
+                    Active Projects
+                  </p>
+                  <p className="mt-2 text-3xl font-bold" style={{ color: '#1A1A1A' }}>
+                    {activeProjectsCount}
+                  </p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: '#E8590C' }}>
+                  <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3.5 7.5h6l1.5 2h9.5v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
+                  </svg>
+                </div>
+              </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-xs text-gray-500">{secondaryMetricLabel}</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">
-                ₹{secondaryMetricValue.toLocaleString('en-IN')}
-              </p>
+            <div className="rounded-lg bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
+                    {secondaryMetricLabel}
+                  </p>
+                  <p className="mt-2 text-xl font-bold" style={{ color: '#1A1A1A' }}>
+                    ₹{secondaryMetricValue.toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: '#C44A0A' }}>
+                  <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="8" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </section>
         )}
 
-        <section className="mt-7">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Your Projects</h2>
+        {/* Projects Section */}
+        <section className="mb-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold" style={{ color: '#1A1A1A' }}>
+              Your Projects
+            </h2>
             {profile.role === 'customer' ? (
               <Link
                 href="/projects/new"
-                className="rounded-lg bg-[#E8590C] px-3 py-2 text-xs font-semibold text-white"
+                className="rounded-lg px-3 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#E8590C' }}
               >
-                Start a Project
+                + New
               </Link>
             ) : null}
           </div>
 
           {profile.role === 'customer' ? (
-            <div className="mb-3 flex flex-wrap gap-2">
-              <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-[11px] font-medium text-yellow-800">
+            <div className="mb-4 flex flex-wrap gap-2">
+              <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: '#FEF3E2', color: '#B8860B' }}>
                 Awaiting contractor
               </span>
-              <span className="rounded-full bg-green-100 px-2.5 py-1 text-[11px] font-medium text-green-700">
+              <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: '#E8F5E9', color: '#2E7D32' }}>
                 In Progress
               </span>
-              <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-medium text-red-700">
-                Contractor declined
+              <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: '#FFEBEE', color: '#C62828' }}>
+                Declined
               </span>
-              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
+              <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ backgroundColor: '#F5F5F5', color: '#616161' }}>
                 Completed
               </span>
             </div>
           ) : null}
 
+          {/* Pending Invitations */}
           {profile.role === 'contractor' && (pendingInvitations?.length ?? 0) > 0 ? (
-            <div className="mb-5">
-              <h3 className="mb-2 text-sm font-semibold text-gray-900">Pending Invitations</h3>
-              <div className="space-y-3">
-                {pendingInvitations?.map((invitation) => (
-                  <div key={invitation.id} className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-sm font-semibold text-gray-900">{invitation.name}</p>
-                    <p className="text-xs text-gray-600">{invitation.city}</p>
-                    <p className="mt-1 text-xs text-gray-600">
-                      Customer: {pendingCustomerNameById.get(invitation.customer_id) ?? 'Customer'}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">Sent {daysAgoText(invitation.created_at)}</p>
+            <div className="mb-5 space-y-3">
+              <h3 className="text-sm font-bold" style={{ color: '#1A1A1A' }}>
+                Pending Invitations
+              </h3>
+              {pendingInvitations?.map((invitation) => (
+                <div key={invitation.id} className="rounded-lg p-4" style={{ backgroundColor: '#FEF3E2', borderLeft: '4px solid #E8590C' }}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold" style={{ color: '#1A1A1A' }}>
+                        {invitation.name}
+                      </p>
+                      <p className="mt-0.5 text-xs" style={{ color: '#7A6F66' }}>
+                        {invitation.city}
+                      </p>
+                      <p className="mt-1 text-xs" style={{ color: '#7A6F66' }}>
+                        Customer: {pendingCustomerNameById.get(invitation.customer_id) ?? 'Customer'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs" style={{ color: '#7A6F66' }}>
+                    Sent {daysAgoText(invitation.created_at)}
+                  </p>
+                  <div className="mt-3 flex gap-2">
                     <InvitationActions projectId={invitation.id} />
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           ) : null}
 
+          {/* Projects List */}
           {safeProjects.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-              <p className="text-sm text-gray-600">No projects yet. Start your first project now.</p>
+            <div className="rounded-lg border border-dashed p-6 text-center" style={{ borderColor: '#E0D5CC', backgroundColor: '#FFFBF7' }}>
+              <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
+                No projects yet. Start your first project now.
+              </p>
               {profile.role === 'customer' ? (
                 <Link
                   href="/projects/new"
-                  className="mt-4 inline-block rounded-lg bg-[#E8590C] px-4 py-2 text-sm font-semibold text-white"
+                  className="mt-4 inline-block rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: '#E8590C' }}
                 >
                   + Create your first project
                 </Link>
@@ -310,6 +365,8 @@ export default async function DashboardPage() {
             <div className="space-y-3">
               {safeProjects.map((project) => {
                 const progress = stageProgress[project.current_stage] ?? 0
+                const isActive = project.status === 'active'
+                const isPending = project.status === 'pending' || project.status === 'on_hold'
                 const stageClass =
                   profile.role === 'customer'
                     ? customerStatusClass[project.status] ?? 'bg-gray-100 text-gray-700'
@@ -330,31 +387,40 @@ export default async function DashboardPage() {
                   <Link
                     href={`/projects/${project.id}`}
                     key={project.id}
-                    className="block rounded-xl border border-gray-200 bg-white p-4"
+                    className="block rounded-lg bg-white p-4 transition-shadow hover:shadow-md"
+                    style={{
+                      borderLeft: isActive ? '4px solid #4CAF50' : isPending ? '4px solid #FFC107' : '4px solid #E0D5CC',
+                    }}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-semibold text-gray-900">{project.name}</h3>
-                        <p className="mt-1 text-sm text-gray-500">
+                      <div className="flex-1">
+                        <h3 className="font-bold" style={{ color: '#1A1A1A' }}>
+                          {project.name}
+                        </h3>
+                        <p className="mt-1 text-xs" style={{ color: '#7A6F66' }}>
                           {project.address}, {project.city}
                         </p>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${stageClass}`}>
+                      <span className="flex flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold" style={getStatusPillStyles(project.status)}>
                         {stageLabel}
                       </span>
                     </div>
 
                     <div className="mt-4">
-                      <div className="h-2 rounded-full bg-gray-100">
-                        <div className="h-2 rounded-full bg-[#E8590C]" style={{ width: `${progress}%` }} />
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 h-2 rounded-full mr-2" style={{ backgroundColor: '#E0D5CC' }}>
+                          <div className="h-2 rounded-full" style={{ width: `${progress}%`, backgroundColor: '#E8590C' }} />
+                        </div>
+                        <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
+                          {progress}%
+                        </p>
                       </div>
-                      <p className="mt-2 text-xs text-gray-500">{progress}% complete</p>
                     </div>
 
-                    <p className="mt-3 text-sm text-gray-700">
-                      {counterpartLabel}: <span className="font-medium">{counterpartName}</span>
+                    <p className="mt-3 text-xs" style={{ color: '#7A6F66' }}>
+                      {counterpartLabel}: <span className="font-semibold" style={{ color: '#1A1A1A' }}>{counterpartName}</span>
                     </p>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs" style={{ color: '#999' }}>
                       Last update: {daysAgoText(latestUpdateByProject.get(project.id))}
                     </p>
                   </Link>
@@ -368,4 +434,12 @@ export default async function DashboardPage() {
       <BottomNav />
     </div>
   )
+}
+
+function getStatusPillStyles(status: string) {
+  if (status === 'active') return { backgroundColor: '#E8F5E9', color: '#2E7D32' }
+  if (status === 'pending' || status === 'on_hold') return { backgroundColor: '#FEF3E2', color: '#B8860B' }
+  if (status === 'completed') return { backgroundColor: '#F5F5F5', color: '#616161' }
+  if (status === 'cancelled') return { backgroundColor: '#FFEBEE', color: '#C62828' }
+  return { backgroundColor: '#F5F5F5', color: '#616161' }
 }

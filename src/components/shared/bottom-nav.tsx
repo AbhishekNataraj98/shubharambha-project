@@ -61,19 +61,19 @@ export default function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed right-0 bottom-0 left-0 border-t border-gray-200 bg-white">
-      <div className="mx-auto grid w-full max-w-md grid-cols-4 px-2 py-2">
+    <nav className="fixed right-0 bottom-0 left-0 bg-white" style={{ borderTop: '1px solid #E0D5CC' }}>
+      <div className="mx-auto grid w-full max-w-md grid-cols-4 px-2 py-3">
         {items.map((item) => {
           const active = item.activeWhen(pathname)
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="flex flex-col items-center gap-1"
-              style={{ color: active ? '#E8590C' : '#888780' }}
+              className="flex flex-col items-center gap-1 transition-colors"
+              style={{ color: active ? '#E8590C' : '#999' }}
             >
               {item.icon}
-              <span className={`text-xs ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
+              <span className={`text-xs ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
             </Link>
           )
         })}
