@@ -206,145 +206,248 @@ export default async function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white px-4 py-5 pb-24">
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-5 flex items-center justify-between">
-          <Link href="/dashboard" className="rounded-full p-2 hover:bg-gray-100" aria-label="Back">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-              <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="1.8" />
-            </svg>
-          </Link>
-          <h1 className="text-lg font-semibold text-gray-900">My Profile</h1>
-          <Link href="/profile/edit" className="text-sm font-medium text-[#E8590C]">
-            Edit
-          </Link>
-        </header>
+    <div className="min-h-screen pb-32" style={{ backgroundColor: '#FAFAFA' }}>
+      {/* Gradient Header */}
+      <div
+        style={{
+          background: 'linear-gradient(to right, #E8590C, #C44A0A)',
+          height: '180px',
+        }}
+        className="relative px-4"
+      >
+        <div className="mx-auto w-full max-w-md">
+          <div className="flex items-start justify-between py-4">
+            <Link href="/dashboard" className="rounded-full p-2 hover:bg-white hover:bg-opacity-20" aria-label="Back">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2" />
+              </svg>
+            </Link>
+            <Link
+              href="/profile/edit"
+              className="rounded-lg px-3 py-2 text-sm font-semibold transition-all hover:bg-white hover:bg-opacity-20"
+              style={{ border: '2px solid white', color: 'white' }}
+            >
+              Edit
+            </Link>
+          </div>
+        </div>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-5 text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#E8590C] text-2xl font-bold text-white">
+        {/* Avatar Overlapping */}
+        <div className="absolute left-1/2 bottom-0 translate-x-[-50%] translate-y-1/2">
+          <div
+            className="flex h-22 w-22 items-center justify-center rounded-full text-3xl font-bold text-white"
+            style={{
+              width: '88px',
+              height: '88px',
+              backgroundColor: '#E8590C',
+              border: '3px solid white',
+            }}
+          >
             {initialsFromName(profile.name)}
           </div>
-          <h2 className="mt-3 text-[20px] font-semibold text-gray-900">{profile.name}</h2>
-          <div className="mt-2 inline-flex rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-[#E8590C]">
-            {profile.role}
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-md px-4" style={{ paddingTop: '44px + 44px' }}>
+        {/* Profile Info */}
+        <section className="mb-6 text-center">
+          <h2 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
+            {profile.name}
+          </h2>
+          <div className="mt-3 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: '#E8590C' }}>
+            {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
           </div>
-          <p className="mt-2 text-sm text-gray-500">{formatPhoneIndian(profile.phone_number)}</p>
-          <p className="text-sm text-gray-600">
+          <p className="mt-3 text-sm font-medium" style={{ color: '#7A6F66' }}>
+            {formatPhoneIndian(profile.phone_number)}
+          </p>
+          <p className="mt-1 text-xs font-medium" style={{ color: '#999' }}>
             {profile.city} · {profile.pincode}
           </p>
         </section>
 
+        {/* Stats Row */}
         {(profile.role === 'contractor' || profile.role === 'worker') && (
-          <section className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-lg border border-gray-200 p-3 text-center">
-              <p className="text-lg font-semibold text-gray-900">{avgRating.toFixed(1)}</p>
-              <p className="text-xs text-gray-500">Avg Rating</p>
+          <section className="mb-6 grid grid-cols-3 gap-3">
+            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+              <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+                {avgRating.toFixed(1)}
+              </p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                Rating
+              </p>
             </div>
-            <div className="rounded-lg border border-gray-200 p-3 text-center">
-              <p className="text-lg font-semibold text-gray-900">{reviewsCount}</p>
-              <p className="text-xs text-gray-500">Reviews</p>
+            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+              <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+                {reviewsCount}
+              </p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                Reviews
+              </p>
             </div>
-            <div className="rounded-lg border border-gray-200 p-3 text-center">
-              <p className="text-lg font-semibold text-gray-900">{projectsCompleted}</p>
-              <p className="text-xs text-gray-500">Projects Completed</p>
+            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+              <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+                {projectsCompleted}
+              </p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                Completed
+              </p>
             </div>
           </section>
         )}
 
+        {/* Location */}
+        {profile.city ? (
+          <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
+            <p className="mb-2 text-xs font-bold" style={{ color: '#999' }}>
+              LOCATION
+            </p>
+            <p className="text-sm font-medium" style={{ color: '#1A1A1A' }}>
+              {profile.city}
+              {profile.pincode && `, ${profile.pincode}`}
+            </p>
+          </section>
+        ) : null}
+
+        {/* About */}
         {profile.bio ? (
-          <section className="mt-5">
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">About</h3>
-            <p className="text-sm text-gray-700">{profile.bio}</p>
+          <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
+            <p className="mb-2 text-xs font-bold" style={{ color: '#999' }}>
+              ABOUT
+            </p>
+            <p className="text-sm font-medium leading-relaxed" style={{ color: '#1A1A1A' }}>
+              {profile.bio}
+            </p>
           </section>
         ) : null}
 
+        {/* Specialisations (Contractor) */}
         {profile.role === 'contractor' ? (
-          <section className="mt-5">
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">Specialisations</h3>
-            <div className="flex flex-wrap gap-2">
-              {specialisations.length ? (
-                specialisations.map((item) => (
-                  <span key={item} className="rounded-full bg-orange-100 px-2.5 py-1 text-xs text-[#E8590C]">
-                    {item}
-                  </span>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">Not added yet</p>
-              )}
-            </div>
-            <h4 className="mt-4 mb-1 text-sm font-semibold text-gray-900">Areas served</h4>
-            <p className="text-sm text-gray-700">{areasServed.length ? areasServed.join(', ') : 'Not added yet'}</p>
-          </section>
+          <>
+            <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
+              <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
+                SPECIALISATIONS
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {specialisations.length ? (
+                  specialisations.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+                      style={{ backgroundColor: '#E8590C' }}
+                    >
+                      {item}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
+                    Not added yet
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
+              <p className="mb-2 text-xs font-bold" style={{ color: '#999' }}>
+                AREAS SERVED
+              </p>
+              <p className="text-sm font-medium" style={{ color: areasServed.length ? '#1A1A1A' : '#7A6F66' }}>
+                {areasServed.length ? areasServed.join(', ') : 'Not added yet'}
+              </p>
+            </section>
+          </>
         ) : null}
 
+        {/* Trade (Worker) */}
         {profile.role === 'worker' ? (
-          <section className="mt-5">
-            <h3 className="mb-2 text-sm font-semibold text-gray-900">Trade</h3>
-            {trade ? (
-              <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs text-[#E8590C]">{trade}</span>
-            ) : (
-              <p className="text-sm text-gray-500">Not added yet</p>
-            )}
-            <h4 className="mt-4 mb-1 text-sm font-semibold text-gray-900">Areas served</h4>
-            <p className="text-sm text-gray-700">{areasServed.length ? areasServed.join(', ') : 'Not added yet'}</p>
-          </section>
+          <>
+            <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
+              <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
+                TRADE
+              </p>
+              {trade ? (
+                <span
+                  className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+                  style={{ backgroundColor: '#E8590C' }}
+                >
+                  {trade}
+                </span>
+              ) : (
+                <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
+                  Not added yet
+                </p>
+              )}
+            </section>
+
+            <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
+              <p className="mb-2 text-xs font-bold" style={{ color: '#999' }}>
+                AREAS SERVED
+              </p>
+              <p className="text-sm font-medium" style={{ color: areasServed.length ? '#1A1A1A' : '#7A6F66' }}>
+                {areasServed.length ? areasServed.join(', ') : 'Not added yet'}
+              </p>
+            </section>
+          </>
         ) : null}
 
-        <section className="mt-6">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900">Recent projects</h3>
-            <Link href="/projects" className="text-xs font-medium text-[#E8590C]">
-              View all projects
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {recentProjects.length ? (
-              recentProjects.map((project) => {
+        {/* Recent Projects */}
+        {recentProjects.length > 0 && (
+          <section className="mb-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-bold" style={{ color: '#1A1A1A' }}>
+                Recent Projects
+              </h3>
+              <Link href="/projects" className="text-sm font-semibold transition-colors hover:opacity-80" style={{ color: '#E8590C' }}>
+                View all →
+              </Link>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {recentProjects.map((project) => {
                 const progress = stageProgress(project.current_stage)
                 return (
                   <Link
                     key={project.id}
                     href={`/projects/${project.id}`}
-                    className="block rounded-xl border border-gray-200 bg-white p-4"
+                    className="flex-shrink-0 rounded-lg bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                    style={{ width: '280px', border: '2px solid #E0D5CC' }}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="text-base font-semibold text-gray-900">{project.name}</h4>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {project.address}, {project.city}
-                        </p>
-                      </div>
+                    <h4 className="font-semibold" style={{ color: '#1A1A1A' }}>
+                      {project.name}
+                    </h4>
+                    <p className="mt-1 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                      {project.city}
+                    </p>
+                    <div className="mt-3 flex items-center justify-between">
                       <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          stagePillClass[project.current_stage] ?? 'bg-gray-100 text-gray-700'
-                        }`}
+                        className="rounded-full px-2.5 py-1 text-xs font-semibold"
+                        style={{
+                          backgroundColor: '#FFF8F5',
+                          color: '#E8590C',
+                        }}
                       >
                         {project.current_stage}
                       </span>
-                    </div>
-                    <div className="mt-4">
-                      <div className="h-2 rounded-full bg-gray-100">
-                        <div className="h-2 rounded-full bg-[#E8590C]" style={{ width: `${progress}%` }} />
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Last updated {daysAgoText(latestUpdateByProject.get(project.id))}
+                      <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
+                        {progress}%
                       </p>
                     </div>
                   </Link>
                 )
-              })
-            ) : (
-              <p className="text-sm text-gray-500">No recent projects.</p>
-            )}
-          </div>
-        </section>
+              })}
+            </div>
+          </section>
+        )}
 
-        <form action={signOutAction} className="mt-6">
+        {/* Sign Out Button */}
+        <form action={signOutAction} className="mb-24">
           <button
             type="submit"
-            className="w-full rounded-lg border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-600"
+            className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors hover:bg-red-50"
+            style={{
+              border: '2px solid #EF4444',
+              color: '#EF4444',
+            }}
           >
-            Sign out
+            Sign Out
           </button>
         </form>
       </div>

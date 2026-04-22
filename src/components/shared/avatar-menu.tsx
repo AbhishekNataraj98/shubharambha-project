@@ -47,7 +47,7 @@ export default function AvatarMenu({ initials }: AvatarMenuProps) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-800"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-white bg-opacity-20 text-sm font-semibold text-white"
         aria-expanded={open}
         aria-haspopup="menu"
       >

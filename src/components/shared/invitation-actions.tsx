@@ -36,12 +36,13 @@ export default function InvitationActions({ projectId }: InvitationActionsProps)
 
   return (
     <div>
-      <div className="mt-3 flex gap-2">
+      <div className="flex gap-2">
         <button
           type="button"
           disabled={isSubmitting !== null}
           onClick={() => respond('accept')}
-          className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          className="flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity disabled:opacity-60 hover:opacity-90"
+          style={{ backgroundColor: '#4CAF50' }}
         >
           {isSubmitting === 'accept' ? 'Accepting...' : 'Accept'}
         </button>
@@ -49,12 +50,13 @@ export default function InvitationActions({ projectId }: InvitationActionsProps)
           type="button"
           disabled={isSubmitting !== null}
           onClick={() => respond('decline')}
-          className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          className="flex-1 rounded-md px-3 py-2 text-xs font-semibold text-white transition-opacity disabled:opacity-60 hover:opacity-90"
+          style={{ backgroundColor: '#F44336' }}
         >
           {isSubmitting === 'decline' ? 'Declining...' : 'Decline'}
         </button>
       </div>
-      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}
     </div>
   )
 }

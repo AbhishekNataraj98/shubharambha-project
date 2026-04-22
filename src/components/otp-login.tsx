@@ -140,20 +140,31 @@ export default function OtpLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white p-4">
+    <div className="flex min-h-screen items-center justify-center p-4" style={{ backgroundColor: '#FFF8F5' }}>
       <div className="w-full max-w-sm">
-        <div className="mb-12 text-center">
-          <div className="mb-3 flex items-center justify-center gap-2">
-            <Image
-              src="/brick-icon.jpg"
-              alt="Shubharambha"
-              width={32}
-              height={32}
-              className="h-8 w-8"
-            />
-            <h1 className="text-3xl font-bold text-gray-900">Shubharambha</h1>
+        {/* Header Section */}
+        <div className="mb-10 text-center">
+          <div className="mb-4 flex items-center justify-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg" style={{ backgroundColor: '#E8590C' }}>
+              <svg
+                className="h-7 w-7"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 4h12M6 4v14M6 18h12M18 4v14M9 9h6M9 13h6" />
+              </svg>
+            </div>
+            <h1 className="text-4xl font-bold" style={{ color: '#1A1A1A' }}>
+              Shubharambha
+            </h1>
           </div>
-          <p className="text-sm text-gray-500">Construction made transparent</p>
+          <p className="text-base font-medium" style={{ color: '#E8590C' }}>
+            Construction made transparent
+          </p>
         </div>
 
         {step === 'phone' ? (
@@ -161,46 +172,66 @@ export default function OtpLogin() {
           // eslint-disable-next-line react-hooks/refs
           <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-6">
             <div>
-              <label className="mb-3 block font-medium text-gray-900">
+              <label className="mb-3 block text-sm font-semibold" style={{ color: '#1A1A1A' }}>
                 Enter your mobile number
               </label>
 
-              <div className="flex gap-2">
-                <div className="flex items-center whitespace-nowrap rounded-lg border border-gray-200 bg-gray-100 px-4 py-3 font-medium text-gray-600">
+              <div className="flex gap-3">
+                <div
+                  className="flex items-center whitespace-nowrap rounded-lg px-4 py-3.5 font-semibold text-white"
+                  style={{ backgroundColor: '#E8590C' }}
+                >
                   +91
                 </div>
                 <input
                   type="tel"
-                  placeholder="Enter 10-digit number"
+                  placeholder="10-digit number"
                   {...phoneInputRegistration}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-lg focus:border-transparent focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                  className="flex-1 rounded-lg border-2 px-4 py-3.5 text-base font-medium focus:outline-none transition-all"
+                  style={{
+                    borderColor: '#E0D5CC',
+                    color: '#1A1A1A',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#E0D5CC'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
               </div>
-              <p className="mt-2 text-xs text-gray-500">We&apos;ll send a 6-digit code via SMS</p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                We&apos;ll send a 6-digit code via SMS
+              </p>
               {phoneForm.formState.errors.phoneNumber?.message ? (
-                <p className="mt-2 text-xs text-red-600">
+                <p className="mt-2 text-xs font-medium text-red-600">
                   {phoneForm.formState.errors.phoneNumber.message}
                 </p>
               ) : null}
             </div>
 
-            {apiError ? <p className="text-sm text-red-600">{apiError}</p> : null}
+            {apiError ? (
+              <p className="rounded-lg px-3 py-2 text-sm font-medium text-red-700 bg-red-50">{apiError}</p>
+            ) : null}
 
             <Button
               type="submit"
               disabled={!phoneForm.formState.isValid || isLoading}
-              className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700"
+              className="w-full rounded-lg py-3.5 font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60"
+              style={{ backgroundColor: '#E8590C' }}
             >
               {isLoading ? 'Sending...' : 'Send OTP'}
             </Button>
           </form>
         ) : (
-          <form onSubmit={otpForm.handleSubmit(verifyOtp)} className="space-y-6">
+          <form onSubmit={otpForm.handleSubmit(verifyOtp)} className="space-y-7">
             <div>
-              <label className="mb-4 block font-medium text-gray-900">
-                Enter the OTP sent to {maskedPhone}
+              <label className="mb-4 block text-sm font-semibold" style={{ color: '#1A1A1A' }}>
+                Enter the OTP sent to <span style={{ color: '#E8590C' }}>{maskedPhone}</span>
               </label>
-              <div className="mb-4 flex justify-center gap-3">
+              <div className="mb-6 flex justify-center gap-2.5">
                 {otpDigits.map((digit, index) => (
                   <input
                     key={index}
@@ -213,19 +244,32 @@ export default function OtpLogin() {
                     value={digit}
                     onChange={(e) => handleOtpChange(index, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                    className="h-12 w-12 rounded-lg border-2 border-gray-300 text-center text-xl font-semibold focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none"
+                    className="h-14 w-14 rounded-lg border-2 text-center text-2xl font-bold transition-all focus:outline-none"
+                    style={{
+                      borderColor: digit ? '#E8590C' : '#E0D5CC',
+                      color: '#1A1A1A',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#E8590C'
+                      e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = otpDigits[index] ? '#E8590C' : '#E0D5CC'
+                      e.target.style.boxShadow = 'none'
+                    }}
                   />
                 ))}
               </div>
 
-              <div className="mb-4 text-center text-sm text-gray-500">
+              <div className="mb-6 text-center text-sm font-medium" style={{ color: '#7A6F66' }}>
                 {timeLeft > 0 ? (
                   <span>Resend OTP in {formatTime(timeLeft)}</span>
                 ) : (
                   <button
                     type="button"
                     onClick={handleResend}
-                    className="font-medium text-orange-600 hover:text-orange-700"
+                    className="font-semibold transition-colors hover:opacity-80"
+                    style={{ color: '#E8590C' }}
                   >
                     Resend OTP
                   </button>
@@ -233,16 +277,19 @@ export default function OtpLogin() {
               </div>
 
               {otpForm.formState.errors.otp?.message ? (
-                <p className="mt-2 text-xs text-red-600">{otpForm.formState.errors.otp.message}</p>
+                <p className="text-xs font-medium text-red-600">{otpForm.formState.errors.otp.message}</p>
               ) : null}
             </div>
 
-            {apiError ? <p className="text-sm text-red-600">{apiError}</p> : null}
+            {apiError ? (
+              <p className="rounded-lg px-3 py-2 text-sm font-medium text-red-700 bg-red-50">{apiError}</p>
+            ) : null}
 
             <Button
               type="submit"
               disabled={!otpForm.formState.isValid || isLoading}
-              className="w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700"
+              className="w-full rounded-lg py-3.5 font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60"
+              style={{ backgroundColor: '#E8590C' }}
             >
               {isLoading ? 'Verifying...' : 'Verify & Continue'}
             </Button>
@@ -256,21 +303,23 @@ export default function OtpLogin() {
                 otpForm.reset({ otp: '' })
                 setTimeLeft(45)
               }}
-              className="w-full text-sm font-medium text-orange-600 hover:text-orange-700"
+              className="w-full py-2 text-sm font-semibold transition-colors hover:opacity-80"
+              style={{ color: '#E8590C' }}
             >
               Change number
             </button>
           </form>
         )}
 
+        {/* Footer */}
         <div className="mt-12 text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
             By continuing you agree to our{' '}
-            <a href="#" className="text-gray-700 underline hover:text-gray-900">
+            <a href="#" className="underline hover:opacity-80" style={{ color: '#1A1A1A' }}>
               Terms
             </a>
             {' & '}
-            <a href="#" className="text-gray-700 underline hover:text-gray-900">
+            <a href="#" className="underline hover:opacity-80" style={{ color: '#1A1A1A' }}>
               Privacy Policy
             </a>
           </p>

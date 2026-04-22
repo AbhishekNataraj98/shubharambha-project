@@ -73,19 +73,22 @@ export default function InviteContractorBar({
   }
 
   return (
-    <div className="fixed right-0 bottom-0 left-0 z-30 border-t border-gray-200 bg-orange-50 p-3">
+    <div className="fixed right-0 bottom-0 left-0 z-30 px-4 py-3" style={{ backgroundColor: 'white', borderTop: '1px solid #E0D5CC' }}>
       <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-[#E8590C]">Send Construction Invitation</p>
-          {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        <div className="flex-1">
+          <p className="text-sm font-bold" style={{ color: '#1A1A1A' }}>
+            Send Invitation
+          </p>
+          {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
         </div>
         <button
           type="button"
           onClick={sendInvite}
           disabled={isLoading}
-          className="rounded-lg bg-[#E8590C] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="flex-shrink-0 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-60 hover:opacity-90"
+          style={{ backgroundColor: '#E8590C' }}
         >
-          {isLoading ? 'Sending...' : `Invite ${contractorName}`}
+          {isLoading ? 'Sending...' : 'Send'}
         </button>
       </div>
     </div>

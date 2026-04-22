@@ -135,23 +135,37 @@ export default async function ProjectsPage({
           ? 'No pending invitations.'
           : 'No completed projects yet.'
 
+  const getStatusBarColor = (status: string) => {
+    if (status === 'on_hold') return '#F59E0B'
+    if (status === 'active') return '#10B981'
+    if (status === 'completed') return '#6B7280'
+    if (status === 'cancelled') return '#EF4444'
+    return '#E0D5CC'
+  }
+
   return (
-    <div className="min-h-screen bg-white px-4 py-5 pb-24">
+    <div className="min-h-screen px-4 py-5 pb-28" style={{ backgroundColor: '#FAFAFA' }}>
       <div className="mx-auto w-full max-w-md">
-        <header className="mb-4">
-          <h1 className="text-xl font-semibold text-gray-900">Projects</h1>
+        <header className="mb-5">
+          <h1 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
+            My Projects
+          </h1>
         </header>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+        {/* Filter Tabs */}
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
           {statusTabs.map((item) => {
             const active = tab === item
             return (
               <Link
                 key={item}
                 href={`/projects?status=${item}`}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${
-                  active ? 'bg-orange-100 text-[#E8590C]' : 'bg-gray-100 text-gray-700'
-                }`}
+                className="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all"
+                style={{
+                  backgroundColor: active ? '#E8590C' : 'white',
+                  color: active ? 'white' : '#7A6F66',
+                  border: active ? 'none' : '2px solid #E0D5CC',
+                }}
               >
                 {item[0].toUpperCase() + item.slice(1)}
               </Link>
@@ -159,53 +173,111 @@ export default async function ProjectsPage({
           })}
         </div>
 
+        {/* Project Cards or Empty State */}
         {filteredProjects.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-600">
-            {emptyMessage}
+          <div className="flex flex-col items-center justify-center rounded-lg bg-white py-12 px-6" style={{ minHeight: '300px' }}>
+            <svg
+              className="h-16 w-16 mb-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              style={{ color: '#E0D5CC' }}
+            >
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            <h2 className="text-lg font-bold text-center" style={{ color: '#1A1A1A' }}>
+              {tab === 'all' ? 'No projects yet' : `No ${tab} projects`}
+            </h2>
+            <p className="mt-2 text-sm text-center" style={{ color: '#7A6F66' }}>
+              {emptyMessage}
+            </p>
+            {tab === 'all' && profile.role === 'customer' ? (
+              <Link
+                href="/projects/new"
+                className="mt-4 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#E8590C' }}
+              >
+                Create Your First Project
+              </Link>
+            ) : null}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredProjects.map((project) => {
               const progress = stageProgress[project.current_stage] ?? 0
+              const statusBarColor = getStatusBarColor(project.status)
               return (
                 <Link
                   href={`/projects/${project.id}`}
                   key={project.id}
-                  className="block rounded-xl border border-gray-200 bg-white p-4"
+                  className="block rounded-lg bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                  style={{
+                    borderLeft: `4px solid ${statusBarColor}`,
+                  }}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold text-gray-900">{project.name}</h2>
-                      <p className="mt-1 text-sm text-gray-500">
+                  <div className="p-4">
+                    {/* Project Name */}
+                    <h2 className="text-base font-bold" style={{ color: '#1A1A1A' }}>
+                      {project.name}
+                    </h2>
+
+                    {/* Address with Icon */}
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <svg
+                        className="h-4 w-4 flex-shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        style={{ color: '#7A6F66' }}
+                      >
+                        <path d="M12 2C7.6 2 4 5.6 4 10c0 5.1 8 12 8 12s8-6.9 8-12c0-4.4-3.6-8-8-8z" />
+                      </svg>
+                      <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
                         {project.address}, {project.city}
                       </p>
                     </div>
-                  </div>
 
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        statusPillClass[project.status] ?? 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {statusLabel[project.status] ?? project.status}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        stagePillClass[project.current_stage] ?? 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {project.current_stage}
-                    </span>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="h-2 rounded-full bg-gray-100">
-                      <div className="h-2 rounded-full bg-[#E8590C]" style={{ width: `${progress}%` }} />
+                    {/* Stage Pill */}
+                    <div className="mt-3 flex gap-2">
+                      <span
+                        className="rounded-full px-2.5 py-1 text-xs font-semibold"
+                        style={{
+                          backgroundColor: stagePillClass[project.current_stage]?.includes('bg-') 
+                            ? '#FFF8F5' 
+                            : '#E0D5CC',
+                          color: '#E8590C',
+                        }}
+                      >
+                        {project.current_stage.charAt(0).toUpperCase() + project.current_stage.slice(1)}
+                      </span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Last updated {daysAgoText(latestUpdateByProject.get(project.id))}
-                    </p>
+
+                    {/* Progress Bar */}
+                    <div className="mt-4">
+                      <div className="h-1 rounded-full" style={{ backgroundColor: '#E0D5CC' }}>
+                        <div
+                          className="h-1 rounded-full transition-all"
+                          style={{ width: `${progress}%`, backgroundColor: '#E8590C' }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                        {progress}% complete
+                      </p>
+                    </div>
+
+                    {/* Bottom Row: Contractor/Customer and Time */}
+                    <div className="mt-3 flex items-center justify-between">
+                      <p className="text-xs font-medium" style={{ color: '#1A1A1A' }}>
+                        {profile.role === 'customer' ? 'Contractor:' : 'Customer:'}{' '}
+                        <span style={{ color: '#7A6F66' }}>Assigned</span>
+                      </p>
+                      <p className="text-xs font-medium" style={{ color: '#999' }}>
+                        {daysAgoText(latestUpdateByProject.get(project.id))}
+                      </p>
+                    </div>
                   </div>
                 </Link>
               )
@@ -214,11 +286,13 @@ export default async function ProjectsPage({
         )}
       </div>
 
+      {/* Floating Action Button */}
       {profile.role === 'customer' ? (
         <Link
           href="/projects/new"
-          className="fixed right-5 bottom-20 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-[#E8590C] text-xl font-bold text-white shadow-lg"
-          aria-label="Create project"
+          className="fixed right-6 bottom-28 z-30 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white transition-transform hover:scale-110 shadow-lg"
+          style={{ backgroundColor: '#E8590C' }}
+          aria-label="Create new project"
         >
           +
         </Link>
