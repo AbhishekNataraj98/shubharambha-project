@@ -141,95 +141,150 @@ export default async function ContractorProfilePage({
       : 0
 
   return (
-    <div className="min-h-screen bg-white px-4 py-5 pb-24">
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-5 flex items-center justify-between">
-          <Link href="/contractors" className="rounded-full p-2 hover:bg-gray-100" aria-label="Back">
+    <div className="min-h-screen pb-32" style={{ backgroundColor: '#FAFAFA' }}>
+      {/* Gradient Hero Section */}
+      <div
+        style={{
+          background: 'linear-gradient(to right, #E8590C, #C44A0A)',
+        }}
+        className="px-4 py-8 text-white"
+      >
+        <div className="mx-auto w-full max-w-md">
+          <Link href="/contractors" className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} aria-label="Back">
             <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-              <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2" />
             </svg>
           </Link>
-        </header>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-xl font-semibold text-[#E8590C]">
+          <div className="flex items-end gap-4">
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white bg-opacity-20 text-4xl font-bold text-white">
               {initials(contractor.name)}
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">{contractor.name}</h1>
-              <p className="text-sm text-gray-500">
-                {contractor.city} · {yearsExperience} years experience
+            <div className="pb-2">
+              <h1 className="text-2xl font-bold">{contractor.name}</h1>
+              <p className="mt-1 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                {contractor.city} · {yearsExperience} years
               </p>
-              <p className="mt-1 text-sm text-gray-700">
-                {starText(averageRating)} {averageRating.toFixed(1)} ({reviewCount})
+              <p className="mt-1 flex items-center gap-1 text-sm font-semibold">
+                {starText(averageRating)}{' '}
+                <span style={{ color: 'rgba(255,255,255,0.9)' }}>
+                  {averageRating.toFixed(1)} ({reviewCount})
+                </span>
               </p>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mx-auto w-full max-w-md px-4 py-6">
+        {/* Specialisations */}
+        {specialisations.length > 0 && (
+          <section className="mb-6 flex flex-wrap gap-2">
             {specialisations.map((item) => (
-              <span key={item} className="rounded-full bg-orange-100 px-2.5 py-1 text-xs text-[#E8590C]">
+              <span
+                key={item}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+                style={{ backgroundColor: '#E8590C' }}
+              >
                 {item}
               </span>
             ))}
-          </div>
-        </section>
+          </section>
+        )}
 
+        {/* About Section */}
         {contractor.bio ? (
-          <section className="mt-5">
-            <h2 className="mb-2 text-sm font-semibold text-gray-900">About</h2>
-            <p className="text-sm text-gray-700">{contractor.bio}</p>
+          <section className="mb-6 rounded-lg bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-bold mb-3" style={{ color: '#1A1A1A' }}>
+              About
+            </h2>
+            <p className="text-sm font-medium leading-relaxed" style={{ color: '#7A6F66' }}>
+              {contractor.bio}
+            </p>
           </section>
         ) : null}
 
-        <section className="mt-5 grid grid-cols-3 gap-2">
-          <div className="rounded-lg border border-gray-200 p-3 text-center">
-            <p className="text-lg font-semibold text-gray-900">{portfolioProjects.length}</p>
-            <p className="text-xs text-gray-500">Projects Completed</p>
+        {/* Stats Row */}
+        <section className="mb-6 grid grid-cols-3 gap-3">
+          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+              {portfolioProjects.length}
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+              Projects Completed
+            </p>
           </div>
-          <div className="rounded-lg border border-gray-200 p-3 text-center">
-            <p className="text-lg font-semibold text-gray-900">{averageRating.toFixed(1)}</p>
-            <p className="text-xs text-gray-500">Avg Rating</p>
+          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+              {averageRating.toFixed(1)}
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+              Avg Rating
+            </p>
           </div>
-          <div className="rounded-lg border border-gray-200 p-3 text-center">
-            <p className="text-lg font-semibold text-gray-900">{serviceCities.length}</p>
-            <p className="text-xs text-gray-500">Cities Served</p>
+          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+              {serviceCities.length}
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+              Cities Served
+            </p>
           </div>
         </section>
 
-        <section className="mt-6">
-          <h2 className="mb-3 text-base font-semibold text-gray-900">Completed Projects</h2>
-          <PortfolioGallery projects={portfolioProjects} />
-        </section>
+        {/* Portfolio Section */}
+        {portfolioProjects.length > 0 && (
+          <section className="mb-6">
+            <h2 className="mb-4 text-lg font-bold" style={{ color: '#1A1A1A' }}>
+              Completed Projects
+            </h2>
+            <PortfolioGallery projects={portfolioProjects} />
+          </section>
+        )}
 
-        <section className="mt-6">
-          <h2 className="mb-3 text-base font-semibold text-gray-900">Reviews</h2>
+        {/* Reviews Section */}
+        <section>
+          <h2 className="mb-4 text-lg font-bold" style={{ color: '#1A1A1A' }}>
+            Reviews ({reviewCount})
+          </h2>
           {reviews && reviews.length > 0 ? (
             <div className="space-y-3">
               {reviews.map((review) => {
                 const reviewerName = reviewerMap.get(review.reviewer_id) ?? 'Customer'
                 const stage = reviewedProjectMap.get(review.project_id) ?? 'Foundation work'
                 return (
-                  <div key={review.id} className="rounded-xl border border-gray-200 p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700">
+                  <div key={review.id} className="rounded-lg bg-white p-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#E8590C' }}>
                         {initials(reviewerName)}
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-700">{starText(Number(review.rating))}</p>
-                        <p className="text-xs text-gray-500">
+                      <div className="flex-1">
+                        <p className="font-semibold" style={{ color: '#1A1A1A' }}>
+                          {reviewerName}
+                        </p>
+                        <p className="text-xs font-semibold" style={{ color: '#B8860B' }}>
+                          {starText(Number(review.rating))}
+                        </p>
+                        <p className="mt-1 text-xs font-medium" style={{ color: '#7A6F66' }}>
                           {stage} · {relativeMonths(review.created_at)}
                         </p>
+                        {review.comment && (
+                          <p className="mt-2 text-sm font-medium leading-relaxed" style={{ color: '#7A6F66' }}>
+                            {review.comment}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <p className="mt-2 text-sm text-gray-700">{review.comment || 'No comment provided.'}</p>
                   </div>
                 )
               })}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">No reviews yet</p>
+            <div className="rounded-lg bg-white p-6 text-center shadow-sm">
+              <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
+                No reviews yet
+              </p>
+            </div>
           )}
         </section>
       </div>
