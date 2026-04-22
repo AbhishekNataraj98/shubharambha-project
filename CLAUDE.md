@@ -57,17 +57,34 @@ Primary color: orange #E8590C  →  Tailwind: bg-orange-500
 App name: Shubharambha
 Tagline: Construction made transparent
 
+## Auth flow
+/login → SMS OTP → verify-otp checks public.users
+  → user exists   → /dashboard
+  → user missing  → /register (single screen: role + all details)
+  → /register saves → /dashboard
+
 ## Build status
 - [x] Project scaffold
 - [x] Supabase schema deployed (14 tables)
-- [x] TypeScript types generated
-- [x] SMS OTP auth flow (login page + 2 API routes)
+- [x] TypeScript types generated  
+- [x] SMS OTP login (/login)
+- [x] OTP verify with redirect logic
 - [x] Middleware protecting routes
-- [ ] Role selection screen
-- [ ] Profile setup screen
-- [ ] Project dashboard
+- [ ] Register screen (single screen, replaces role-select + profile-setup)
+- [ ] Dashboard
+- [ ] Project creation
 - [ ] Daily updates feed
 - [ ] Payment ledger
 - [ ] Chat (Supabase Realtime)
-- [ ] Contractor discovery + ratings
+- [ ] Contractor discovery
 - [ ] Materials marketplace
+
+## Business rules
+- ONLY customers can create projects — never contractors
+- Project flow: customer creates → contractor invited → 
+  contractor accepts → project becomes active
+- Project statuses: pending (awaiting acceptance) → 
+  active → completed | cancelled
+- Contractor phone never shown until project is active
+- Reviews only submittable after project marked completed
+- Ratings recalculated on every new review insert

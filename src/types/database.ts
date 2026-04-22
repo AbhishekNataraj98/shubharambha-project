@@ -75,3 +75,17 @@ export interface Message {
   message_type: 'text' | 'photo' | 'system'
   created_at: string
 }
+
+import type { Database } from './supabase'
+
+export type Tables<T extends keyof Database['public']['Tables']> =
+  Database['public']['Tables'][T]['Row']
+
+export type UserRow = Tables<'users'>
+export type ProjectRow = Tables<'projects'>
+export type PaymentRow = Tables<'payments'>
+export type DailyUpdateRow = Tables<'daily_updates'>
+export type MessageRow = Tables<'messages'>
+export type ContractorProfileRow = Tables<'contractor_profiles'>
+export type ShopRow = Tables<'shops'>
+export type ProductRow = Tables<'products'>
