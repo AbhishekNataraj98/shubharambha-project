@@ -2,8 +2,52 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { Check, ChevronLeft, MapPin, MoreVertical } from 'lucide-react'
 import type { Database } from '@/types/supabase'
 import ReinviteContractorButton from '@/components/shared/reinvite-contractor-button'
+import ProjectDetailTabs from '@/components/shared/project-detail-tabs'
+
+const stageOrder = [
+  'foundation',
+  'plinth',
+  'walls',
+  'slab',
+  'plastering',
+  'finishing',
+] as const
+
+const stageLabels: Record<(typeof stageOrder)[number], string> = {
+  foundation: 'Foundation',
+  plinth: 'Plinth',
+  walls: 'Walls',
+  slab: 'Slab',
+  plastering: 'Plastering',
+  finishing: 'Finishing',
+}
+
+const statusBadgeClass: Record<string, string> = {
+  on_hold: 'bg-yellow-100 text-yellow-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+  active: 'bg-green-100 text-green-700',
+  completed: 'bg-gray-100 text-gray-700',
+  cancelled: 'bg-red-100 text-red-700',
+}
+
+const statusBadgeLabel: Record<string, string> = {
+  on_hold: 'Awaiting contractor',
+  pending: 'Awaiting contractor',
+  active: 'In Progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+}
 
 export default async function ProjectDetailPage({
   params,
@@ -51,39 +95,163 @@ export default async function ProjectDetailPage({
   const userMap = new Map((relatedUsers ?? []).map((entry) => [entry.id, entry]))
   const customer = userMap.get(project.customer_id)
   const contractor = project.contractor_id ? userMap.get(project.contractor_id) : null
+  const currentUserName =
+    userMap.get(user.id)?.name ??
+    (
+      await admin
+        .from('users')
+        .select('name')
+        .eq('id', user.id)
+        .maybeSingle()
+    ).data?.name ??
+    'You'
+
+  const { data: updates } = await admin
+    .from('daily_updates')
+    .select('id,project_id,posted_by,description,stage_tag,photo_urls,created_at')
+    .eq('project_id', project.id)
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const postedByIds = Array.from(new Set((updates ?? []).map((u) => u.posted_by)))
+  const { data: postedUsers } = postedByIds.length
+    ? await admin.from('users').select('id,name').in('id', postedByIds)
+    : { data: [] as Array<{ id: string; name: string }> }
+  const postedByMap = new Map((postedUsers ?? []).map((u) => [u.id, u.name]))
+
+  const updatesPayload = (updates ?? []).map((update) => {
+    const postedByName = postedByMap.get(update.posted_by) ?? 'Contractor'
+    return {
+      id: update.id,
+      postedByName,
+      postedByInitials: initials(postedByName),
+      description: update.description,
+      stageTag: update.stage_tag,
+      createdAt: update.created_at,
+      photoUrls: update.photo_urls ?? [],
+    }
+  })
+
+  const { data: payments } = await admin
+    .from('payments')
+    .select('id,amount,payment_mode,paid_to_category,description,status,paid_to')
+    .eq('project_id', project.id)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  const paidToIds = Array.from(new Set((payments ?? []).map((p) => p.paid_to)))
+  const { data: paidToUsers } = paidToIds.length
+    ? await admin.from('users').select('id,name').in('id', paidToIds)
+    : { data: [] as Array<{ id: string; name: string }> }
+  const paidToMap = new Map((paidToUsers ?? []).map((u) => [u.id, u.name]))
+
+  const confirmedPayments = (payments ?? []).filter((payment) => payment.status === 'confirmed')
+  const totalConfirmed = confirmedPayments.reduce((sum, payment) => sum + payment.amount, 0)
+  const pendingCount = (payments ?? []).filter((payment) => payment.status === 'pending_confirmation').length
+  const confirmedCount = confirmedPayments.length
+
+  const paymentsPayload = (payments ?? []).map((payment) => ({
+    id: payment.id,
+    amount: payment.amount,
+    paymentMode: payment.payment_mode,
+    paidToCategory: payment.paid_to_category,
+    description: payment.description,
+    status: payment.status,
+    paidToName: paidToMap.get(payment.paid_to) ?? 'User',
+  }))
+
+  const currentStageIndex = stageOrder.indexOf(project.current_stage as (typeof stageOrder)[number])
 
   return (
-    <div className="min-h-screen bg-white px-4 py-5">
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-5 flex items-center gap-3">
-          <Link href="/dashboard" className="rounded-full p-2 hover:bg-gray-100" aria-label="Back to dashboard">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-              <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="1.8" />
-            </svg>
+    <div className="min-h-screen bg-[#FAFAFA] pb-24">
+      <header className="sticky top-0 z-30 bg-white shadow-sm">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
+          <Link href="/projects" className="rounded-full p-2 hover:bg-gray-100" aria-label="Back to projects">
+            <ChevronLeft className="h-5 w-5 text-gray-700" />
           </Link>
-          <h1 className="text-xl font-semibold text-gray-900">Project Details</h1>
-        </header>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-gray-900">{project.name}</h2>
-          <p className="mt-1 text-sm text-gray-600">{project.address}</p>
-          <p className="text-sm text-gray-600">{project.city}</p>
-          <p className="mt-3 text-sm text-gray-700">
-            Status: <span className="font-medium">{project.status}</span>
-          </p>
-          <p className="text-sm text-gray-700">
-            Stage: <span className="font-medium">{project.current_stage}</span>
-          </p>
-          <p className="mt-3 text-sm text-gray-700">
-            Customer: <span className="font-medium">{customer?.name ?? 'Unknown'}</span>
-          </p>
-          <p className="text-sm text-gray-700">
-            Contractor: <span className="font-medium">{contractor?.name ?? 'Not assigned'}</span>
-          </p>
+          <h1 className="truncate text-center text-base font-bold text-gray-900">{project.name}</h1>
+          <button type="button" className="rounded-full p-2 text-gray-500" aria-label="More actions">
+            <MoreVertical className="h-5 w-5" />
+          </button>
         </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-md">
+        <section className="relative mx-4 mt-4 rounded-xl border border-gray-100 border-l-4 border-l-orange-500 bg-white p-4">
+          <span
+            className={`absolute top-3 right-3 rounded-full px-2.5 py-1 text-xs font-semibold ${
+              statusBadgeClass[project.status] ?? 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            {statusBadgeLabel[project.status] ?? project.status}
+          </span>
+
+          <h2 className="pr-20 text-lg font-bold text-gray-900">{project.name}</h2>
+          <div className="mt-1 flex items-start gap-1.5">
+            <MapPin className="mt-0.5 h-[14px] w-[14px] text-orange-500" />
+            <p className="text-sm text-gray-500">
+              {project.address}, {project.city}
+            </p>
+          </div>
+
+          <div className="mt-3 flex items-start gap-4">
+            <div className="text-center">
+              <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                {initials(customer?.name ?? 'Customer')}
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500">Customer</p>
+            </div>
+            <div className="text-center">
+              <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-xs font-semibold text-[#E8590C]">
+                {initials(contractor?.name ?? 'Contractor')}
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500">Contractor</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-4 mt-3 rounded-xl border border-gray-100 bg-white p-4">
+          <div className="flex items-start justify-between gap-1">
+            {stageOrder.map((stage, index) => {
+              const completed = index < currentStageIndex
+              const current = index === currentStageIndex
+              return (
+                <div key={stage} className="flex min-w-0 flex-1 items-start">
+                  <div className="flex min-w-0 flex-1 flex-col items-center">
+                    <div
+                      className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                        completed
+                          ? 'bg-orange-500 text-white'
+                          : current
+                            ? 'ring-offset-background bg-orange-500 text-white ring-2 ring-orange-200 ring-offset-2'
+                            : 'border-2 border-gray-200 bg-white text-gray-400'
+                      }`}
+                    >
+                      {completed ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : current ? (
+                        <div className="h-2 w-2 rounded-full bg-white" />
+                      ) : null}
+                    </div>
+                    <p
+                      className={`mt-1 truncate text-[10px] ${
+                        completed || current ? 'font-medium text-orange-600' : 'text-gray-400'
+                      }`}
+                    >
+                      {stageLabels[stage]}
+                    </p>
+                  </div>
+                  {index < stageOrder.length - 1 ? (
+                    <div className={`mt-3 h-0.5 flex-1 ${index < currentStageIndex ? 'bg-orange-500' : 'bg-gray-200'}`} />
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </section>
 
         {isCustomer && project.status === 'cancelled' ? (
-          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="mb-3 text-sm text-amber-800">
               This invitation was declined. You can invite a different contractor for the same project.
             </p>
@@ -96,6 +264,19 @@ export default async function ProjectDetailPage({
             />
           </div>
         ) : null}
+
+        <ProjectDetailTabs
+          projectId={project.id}
+          currentUserId={user.id}
+          currentUserName={currentUserName}
+          contractorId={project.contractor_id}
+          isContractor={isContractor}
+          totalConfirmed={totalConfirmed}
+          pendingCount={pendingCount}
+          confirmedCount={confirmedCount}
+          updates={updatesPayload}
+          payments={paymentsPayload}
+        />
       </div>
     </div>
   )
