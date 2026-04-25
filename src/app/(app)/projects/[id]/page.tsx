@@ -6,6 +6,7 @@ import { Check, ChevronLeft, MapPin, MoreVertical } from 'lucide-react'
 import type { Database } from '@/types/supabase'
 import ReinviteContractorButton from '@/components/shared/reinvite-contractor-button'
 import ProjectDetailTabs from '@/components/shared/project-detail-tabs'
+import NotificationBell from '@/components/shared/NotificationBell'
 
 const stageOrder = [
   'foundation',
@@ -105,60 +106,15 @@ export default async function ProjectDetailPage({
         .maybeSingle()
     ).data?.name ??
     'You'
-
-  const { data: updates } = await admin
-    .from('daily_updates')
-    .select('id,project_id,posted_by,description,stage_tag,photo_urls,created_at')
-    .eq('project_id', project.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  const postedByIds = Array.from(new Set((updates ?? []).map((u) => u.posted_by)))
-  const { data: postedUsers } = postedByIds.length
-    ? await admin.from('users').select('id,name').in('id', postedByIds)
-    : { data: [] as Array<{ id: string; name: string }> }
-  const postedByMap = new Map((postedUsers ?? []).map((u) => [u.id, u.name]))
-
-  const updatesPayload = (updates ?? []).map((update) => {
-    const postedByName = postedByMap.get(update.posted_by) ?? 'Contractor'
-    return {
-      id: update.id,
-      postedByName,
-      postedByInitials: initials(postedByName),
-      description: update.description,
-      stageTag: update.stage_tag,
-      createdAt: update.created_at,
-      photoUrls: update.photo_urls ?? [],
-    }
-  })
-
-  const { data: payments } = await admin
-    .from('payments')
-    .select('id,amount,payment_mode,paid_to_category,description,status,paid_to')
-    .eq('project_id', project.id)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  const paidToIds = Array.from(new Set((payments ?? []).map((p) => p.paid_to)))
-  const { data: paidToUsers } = paidToIds.length
-    ? await admin.from('users').select('id,name').in('id', paidToIds)
-    : { data: [] as Array<{ id: string; name: string }> }
-  const paidToMap = new Map((paidToUsers ?? []).map((u) => [u.id, u.name]))
-
-  const confirmedPayments = (payments ?? []).filter((payment) => payment.status === 'confirmed')
-  const totalConfirmed = confirmedPayments.reduce((sum, payment) => sum + payment.amount, 0)
-  const pendingCount = (payments ?? []).filter((payment) => payment.status === 'pending_confirmation').length
-  const confirmedCount = confirmedPayments.length
-
-  const paymentsPayload = (payments ?? []).map((payment) => ({
-    id: payment.id,
-    amount: payment.amount,
-    paymentMode: payment.payment_mode,
-    paidToCategory: payment.paid_to_category,
-    description: payment.description,
-    status: payment.status,
-    paidToName: paidToMap.get(payment.paid_to) ?? 'User',
-  }))
+  const currentUserRole =
+    (
+      await admin
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+    ).data?.role ?? 'customer'
+  const contractorName = contractor?.name ?? 'Contractor'
 
   const currentStageIndex = stageOrder.indexOf(project.current_stage as (typeof stageOrder)[number])
 
@@ -170,9 +126,12 @@ export default async function ProjectDetailPage({
             <ChevronLeft className="h-5 w-5 text-gray-700" />
           </Link>
           <h1 className="truncate text-center text-base font-bold text-gray-900">{project.name}</h1>
-          <button type="button" className="rounded-full p-2 text-gray-500" aria-label="More actions">
-            <MoreVertical className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell userId={user.id} />
+            <button type="button" className="rounded-full p-2 text-gray-500" aria-label="More actions">
+              <MoreVertical className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -269,13 +228,10 @@ export default async function ProjectDetailPage({
           projectId={project.id}
           currentUserId={user.id}
           currentUserName={currentUserName}
+          currentUserRole={currentUserRole}
+          contractorName={contractorName}
           contractorId={project.contractor_id}
-          isContractor={isContractor}
-          totalConfirmed={totalConfirmed}
-          pendingCount={pendingCount}
-          confirmedCount={confirmedCount}
-          updates={updatesPayload}
-          payments={paymentsPayload}
+          customerId={project.customer_id}
         />
       </div>
     </div>

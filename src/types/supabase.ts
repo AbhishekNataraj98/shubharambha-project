@@ -91,6 +91,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          materials_used: string | null
           photo_urls: string[]
           posted_by: string
           project_id: string
@@ -100,6 +101,7 @@ export type Database = {
           created_at?: string
           description: string
           id?: string
+          materials_used?: string | null
           photo_urls?: string[]
           posted_by: string
           project_id: string
@@ -109,6 +111,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          materials_used?: string | null
           photo_urls?: string[]
           posted_by?: string
           project_id?: string
@@ -284,6 +287,64 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          payment_id: string | null
+          project_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          payment_id?: string | null
+          project_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          payment_id?: string | null
+          project_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_confirmations: {
         Row: {
           confirmer_id: string
@@ -330,6 +391,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          decline_reason: string | null
           description: string
           id: string
           paid_at: string
@@ -339,12 +401,14 @@ export type Database = {
           project_id: string
           receipt_url: string | null
           recorded_by: string
+          recorded_by_role: string | null
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
         }
         Insert: {
           amount: number
           created_at?: string
+          decline_reason?: string | null
           description: string
           id?: string
           paid_at?: string
@@ -354,12 +418,14 @@ export type Database = {
           project_id: string
           receipt_url?: string | null
           recorded_by: string
+          recorded_by_role?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
         Update: {
           amount?: number
           created_at?: string
+          decline_reason?: string | null
           description?: string
           id?: string
           paid_at?: string
@@ -369,6 +435,7 @@ export type Database = {
           project_id?: string
           receipt_url?: string | null
           recorded_by?: string
+          recorded_by_role?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
@@ -798,7 +865,11 @@ export type Database = {
       message_type: "text" | "photo" | "system"
       payment_category: "labour" | "material" | "contractor_fee" | "other"
       payment_mode: "cash" | "upi" | "bank_transfer" | "cheque"
-      payment_status: "pending_confirmation" | "confirmed" | "rejected"
+      payment_status:
+        | "pending_confirmation"
+        | "confirmed"
+        | "rejected"
+        | "declined"
       project_member_role: "customer" | "contractor" | "worker" | "viewer"
       project_status: "active" | "on_hold" | "completed" | "cancelled"
       user_role: "customer" | "contractor" | "worker" | "supplier"
@@ -944,7 +1015,12 @@ export const Constants = {
       message_type: ["text", "photo", "system"],
       payment_category: ["labour", "material", "contractor_fee", "other"],
       payment_mode: ["cash", "upi", "bank_transfer", "cheque"],
-      payment_status: ["pending_confirmation", "confirmed", "rejected"],
+      payment_status: [
+        "pending_confirmation",
+        "confirmed",
+        "rejected",
+        "declined",
+      ],
       project_member_role: ["customer", "contractor", "worker", "viewer"],
       project_status: ["active", "on_hold", "completed", "cancelled"],
       user_role: ["customer", "contractor", "worker", "supplier"],
