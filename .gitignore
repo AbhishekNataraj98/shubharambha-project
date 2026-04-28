@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Web build outputs
+apps/web/.next/
+apps/web/out/
+
+# Mobile build outputs  
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/ios/
+apps/mobile/android/
+
+# Environment files — NEVER commit these
+.env.local
+.env.*.local
+apps/web/.env.local
+apps/mobile/.env.local
+
+# OS
+.DS_Store
+*.DS_Store
+Thumbs.db
+
+# Turbo cache
+.turbo/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor
+.vscode/
+.idea/
+
+node_modules/
+.next/
+.env
+.env.local
+build/
+dist/

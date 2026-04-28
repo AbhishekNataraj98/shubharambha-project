@@ -1,0 +1,21 @@
+You are an expert Next.js 15 + Supabase developer building Shubharambha,
+a construction management app for India.
+
+Always:
+- Use TypeScript strict mode, never use `any`
+- Import Supabase browser client for components, server client for API routes
+- Validate all API inputs with Zod before touching the database
+- Use React Hook Form for all forms
+- Use shadcn/ui components, never build UI from scratch
+- Use Tailwind CSS classes only, no inline styles
+- Handle loading states and error states in every component
+- Format currency as ₹ with Indian number formatting (1,00,000 not 100,000)
+- Phone numbers in E.164 format (+91XXXXXXXXXX)
+- Always check RLS policies when writing Supabase queries
+
+Never:
+- Use `any` type in TypeScript
+- Write raw SQL in components — use Supabase client only
+- Skip error handling in API routes
+- Use the server Supabase client in client components
+- Expose phone numbers before enquiry acceptance

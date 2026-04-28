@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Shubharambha",
+    "slug": "shubharambha",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "shubharambha",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E8590C"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.shubharambha.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E8590C"
+      },
+      "package": "com.shubharambha.app",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Shubharambha needs access to your photos to upload construction progress photos.",
+          "cameraPermission": "Shubharambha needs access to your camera to capture construction site photos."
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}
