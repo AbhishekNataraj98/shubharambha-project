@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   Text,
@@ -17,6 +18,8 @@ import { supabase } from '@/lib/supabase'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 import { dateLabelForFeed, getInitials, relativeTime } from '@/lib/utils'
 import { ProjectHeroAndStage } from '@/components/project-detail/ProjectChrome'
+import { KeyboardSafeView } from '@/lib/keyboardSafe'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { DetailTab, FeedbackState, UpdateItem } from '@/components/project-detail/types'
 
 const BRAND = '#E8590C'
@@ -49,6 +52,7 @@ type UpdatesTabProps = {
     professionalName?: string
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
+    onPressProjectImages?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -67,6 +71,7 @@ export function UpdatesTab({
   onTabChange,
   listHeaderProps,
 }: UpdatesTabProps) {
+  const insets = useSafeAreaInsets()
   const channelSuffixRef = useRef(Math.random().toString(36).slice(2))
   const [updates, setUpdates] = useState<UpdateItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -309,6 +314,7 @@ export function UpdatesTab({
         professionalName={listHeaderProps.professionalName}
         professionalRole={listHeaderProps.professionalRole}
         onPressProfessional={listHeaderProps.onPressProfessional}
+      onPressProjectImages={listHeaderProps.onPressProjectImages}
         contractorAssigned={listHeaderProps.contractorAssigned}
         hideStageTracker={listHeaderProps.hideStageTracker}
         showReportsTab={listHeaderProps.showReportsTab}
@@ -328,6 +334,10 @@ export function UpdatesTab({
   }
 
   return (
+    <KeyboardSafeView
+      includeTopSafeArea={false}
+      iosKeyboardOffsetOverride={Platform.OS === 'ios' ? insets.top + 8 : undefined}
+    >
     <View style={{ flex: 1 }}>
       {listHeader}
       <FlatList
@@ -568,5 +578,6 @@ export function UpdatesTab({
         </View>
       </Modal>
     </View>
+    </KeyboardSafeView>
   )
 }

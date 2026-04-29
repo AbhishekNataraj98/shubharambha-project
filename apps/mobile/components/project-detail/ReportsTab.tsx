@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,8 @@ import { apiGet, apiPost } from '@/lib/api'
 import { getResolvedApiBaseUrl } from '@/lib/getApiBaseUrl'
 import type { DetailTab } from '@/components/project-detail/types'
 import { FinancialSetupSheet } from '@/components/reports/FinancialSetupSheet'
+import { KeyboardSafeView } from '@/lib/keyboardSafe'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 type ReportsTabProps = {
   projectId: string
@@ -33,6 +36,7 @@ type ReportsTabProps = {
     professionalName?: string
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
+    onPressProjectImages?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -89,6 +93,7 @@ const inr = new Intl.NumberFormat('en-IN', {
 })
 
 export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange, listHeaderProps }: ReportsTabProps) {
+  const insets = useSafeAreaInsets()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [report, setReport] = useState<ReportsPayload | null>(null)
@@ -241,6 +246,10 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
   const maxBarWidth = 180
 
   return (
+    <KeyboardSafeView
+      includeTopSafeArea={false}
+      iosKeyboardOffsetOverride={Platform.OS === 'ios' ? insets.top + 8 : undefined}
+    >
     <View style={{ flex: 1 }}>
       <ProjectHeroAndStage
         projectName={listHeaderProps.projectName}
@@ -253,6 +262,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
         professionalName={listHeaderProps.professionalName}
         professionalRole={listHeaderProps.professionalRole}
         onPressProfessional={listHeaderProps.onPressProfessional}
+      onPressProjectImages={listHeaderProps.onPressProjectImages}
         contractorAssigned={listHeaderProps.contractorAssigned}
         hideStageTracker={listHeaderProps.hideStageTracker}
         showReportsTab={listHeaderProps.showReportsTab}
@@ -261,6 +271,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
       />
       <ScrollView
         contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor="#E8590C" />}
       >
         {loading ? (
@@ -492,6 +503,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
         onSuccess={() => void load({ silent: true })}
       />
     </View>
+    </KeyboardSafeView>
   )
 }
 

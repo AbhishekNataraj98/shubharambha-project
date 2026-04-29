@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -13,6 +13,7 @@ import { apiGet } from '@/lib/api'
 import { starText } from '@/lib/utils'
 import { useSessionState } from '@/lib/auth-state'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { colors, initialsFromName } from '@/lib/theme'
 
 const PROFILE_OPTIONS = ['Contractor', 'Mason', 'Plumber', 'Carpenter', 'Electrician', 'Painter'] as const
@@ -30,8 +31,11 @@ type ContractorSearchItem = {
   years_experience: number
 }
 
+const PROFILE_NAV_DEBOUNCE_MS = 600
+
 export default function SearchTab() {
   const router = useRouter()
+  const lastProfileNavAtRef = useRef(0)
   const params = useLocalSearchParams<{ city?: string; projectDraft?: string }>()
   const { profile } = useSessionState()
   const [city, setCity] = useState('')
@@ -79,15 +83,19 @@ export default function SearchTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+      <KeyboardSafeView includeTopSafeArea={false}>
+      <View style={{ flex: 1 }}>
       {projectDraftMode ? (
         <View style={{ backgroundColor: colors.brand, paddingVertical: 12, paddingHorizontal: 16 }}>
           <Text style={{ textAlign: 'center', fontWeight: '700', color: '#FFFFFF' }}>Select a contractor for your project</Text>
         </View>
       ) : null}
       <FlatList
+        style={{ flex: 1 }}
         data={filteredContractors}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={colors.brand} />}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
             <Text style={{ fontSize: 24, fontWeight: '800', color: colors.foreground }}>Find Contractors</Text>
@@ -177,7 +185,11 @@ export default function SearchTab() {
                 <Text style={{ marginTop: 8, fontSize: 12, color: colors.muted }}>{c.projects_completed} projects completed</Text>
                 <TouchableOpacity
                   onPress={() => {
-                    router.push({
+                    const now = Date.now()
+                    if (now - lastProfileNavAtRef.current < PROFILE_NAV_DEBOUNCE_MS) return
+                    lastProfileNavAtRef.current = now
+                    // navigate merges with an existing contractor screen when possible (avoids duplicate stack entries)
+                    router.navigate({
                       pathname: '/contractors/[id]',
                       params: {
                         id: String(c.id),
@@ -216,6 +228,8 @@ export default function SearchTab() {
           ) : null
         }
       />
+      </View>
+      </KeyboardSafeView>
     </SafeAreaView>
   )
 }

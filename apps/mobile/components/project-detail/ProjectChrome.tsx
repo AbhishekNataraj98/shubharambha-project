@@ -1,6 +1,5 @@
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { STAGE_LABELS, STAGE_ORDER, type DetailTab, type StageKey } from '@/components/project-detail/types'
-import { getInitials } from '@/lib/utils'
 
 const BRAND = '#E8590C'
 const BORDER = '#E0D5CC'
@@ -26,6 +25,7 @@ type ProjectChromeProps = {
   professionalName?: string
   professionalRole?: 'worker' | 'contractor' | null
   onPressProfessional?: () => void
+  onPressProjectImages?: () => void
   contractorAssigned?: boolean
   activeTab: DetailTab
   onTabChange: (tab: DetailTab) => void
@@ -35,7 +35,7 @@ type ProjectChromeProps = {
 }
 
 export function ProjectHeroAndStage(props: ProjectChromeProps) {
-  const { projectName, address, city, status, currentStage, customerName, contractorName } = props
+  const { projectName, address, city, status, currentStage } = props
   const badge = STATUS_BADGE[status] ?? STATUS_BADGE.completed
   const badgeLabel =
     status === 'pending' || status === 'on_hold'
@@ -71,47 +71,41 @@ export function ProjectHeroAndStage(props: ProjectChromeProps) {
         <Text style={{ marginTop: 6, fontSize: 12, color: MUTED }}>
           📍 {address}, {city}
         </Text>
-        <View style={{ marginTop: 10, flexDirection: 'row', gap: 18 }}>
-          <View style={{ alignItems: 'center' }}>
-            <View
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                backgroundColor: '#DBEAFE',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+        {props.professionalName ? (
+          props.onPressProfessional ? (
+            <TouchableOpacity
+              onPress={props.onPressProfessional}
+              style={{ marginTop: 10, alignSelf: 'flex-start', borderRadius: 8, backgroundColor: '#FFF8F5', paddingHorizontal: 10, paddingVertical: 6 }}
+              activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4ED8' }}>{getInitials(customerName)}</Text>
-            </View>
-            <Text style={{ marginTop: 4, fontSize: 9, color: MUTED }}>Customer</Text>
-          </View>
-          <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND }}>
+                {props.professionalRole === 'worker' ? 'Worker' : 'Contractor'}: {props.professionalName} (Tap to view profile/review)
+              </Text>
+            </TouchableOpacity>
+          ) : (
             <View
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                backgroundColor: '#FFEDD5',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              style={{ marginTop: 10, alignSelf: 'flex-start', borderRadius: 8, backgroundColor: '#FFF8F5', paddingHorizontal: 10, paddingVertical: 6 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND }}>{getInitials(contractorName)}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND }}>
+                {props.professionalRole === 'worker' ? 'Worker' : 'Contractor'}: {props.professionalName}
+              </Text>
             </View>
-            <Text style={{ marginTop: 4, fontSize: 9, color: MUTED }}>Contractor</Text>
-          </View>
-        </View>
-        {props.onPressProfessional ? (
+          )
+        ) : null}
+        {props.onPressProjectImages ? (
           <TouchableOpacity
-            onPress={props.onPressProfessional}
-            style={{ marginTop: 10, alignSelf: 'flex-start', borderRadius: 8, backgroundColor: '#FFF8F5', paddingHorizontal: 10, paddingVertical: 6 }}
-            activeOpacity={0.8}
+            onPress={props.onPressProjectImages}
+            style={{
+              marginTop: 10,
+              alignSelf: 'flex-start',
+              borderRadius: 10,
+              backgroundColor: BRAND,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+            }}
+            activeOpacity={0.85}
           >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND }}>
-              {props.professionalRole === 'worker' ? 'Worker' : 'Contractor'}: {props.professionalName ?? 'View profile'} (Tap to view profile/review)
-            </Text>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>View Project Images</Text>
           </TouchableOpacity>
         ) : null}
       </View>

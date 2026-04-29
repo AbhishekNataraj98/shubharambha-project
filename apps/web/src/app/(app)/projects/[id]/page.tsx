@@ -46,12 +46,10 @@ function awaitingLabel(project: { contractor_id: string | null }) {
   return project.contractor_id ? 'Waiting contractor approval' : 'Waiting worker approval'
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
+function isGenericRoleName(name: string | null | undefined) {
+  if (!name) return true
+  const normalized = name.trim().toLowerCase()
+  return normalized === 'worker' || normalized === 'contractor' || normalized === 'professional'
 }
 
 export default async function ProjectDetailPage({
@@ -107,25 +105,34 @@ export default async function ProjectDetailPage({
     ? await admin.from('users').select('id,name,pincode,role').in('id', relatedUserIds)
     : { data: [] as Array<{ id: string; name: string; pincode: string; role: string }> }
   const userMap = new Map((relatedUsers ?? []).map((entry) => [entry.id, entry]))
-  const customer = userMap.get(project.customer_id)
   const contractor = project.contractor_id ? userMap.get(project.contractor_id) : null
   const currentUserName = userMap.get(user.id)?.name ?? 'You'
   const currentUserRole = userMap.get(user.id)?.role ?? 'customer'
   const contractorName = contractor?.name ?? 'Contractor'
-  const preferredProfessionalMember =
-    (membersForProject ?? []).find((member) => member.user_id !== project.customer_id && member.role === 'worker') ??
-    (membersForProject ?? []).find((member) => member.user_id !== project.customer_id && member.role === 'contractor') ??
-    null
-  const preferredProfessionalId = preferredProfessionalMember?.user_id ?? project.contractor_id ?? null
-  const preferredProfessionalRole =
-    preferredProfessionalMember?.role === 'worker' || preferredProfessionalMember?.role === 'contractor'
-      ? preferredProfessionalMember.role
-      : project.contractor_id
-        ? 'contractor'
-        : null
-  const preferredProfessionalName =
-    (preferredProfessionalId ? userMap.get(preferredProfessionalId)?.name : null) ??
-    (preferredProfessionalRole === 'worker' ? 'Worker' : preferredProfessionalRole === 'contractor' ? 'Contractor' : null)
+  const candidateMembers = (membersForProject ?? []).filter(
+    (member) => member.user_id !== project.customer_id && (member.role === 'worker' || member.role === 'contractor')
+  )
+  const rankedCandidates = candidateMembers
+    .map((member) => {
+      const role = member.role as 'worker' | 'contractor'
+      const name = userMap.get(member.user_id)?.name ?? null
+      const score = (role === 'worker' ? 0 : 2) + (isGenericRoleName(name) ? 1 : 0)
+      return { id: member.user_id, role, name, score }
+    })
+    .sort((a, b) => a.score - b.score)
+  const bestProfessional = rankedCandidates[0] ?? null
+  const preferredProfessionalId = bestProfessional?.id ?? project.contractor_id ?? null
+  const preferredProfessionalRole = bestProfessional?.role ?? (project.contractor_id ? 'contractor' : null)
+  const preferredProfessionalName = bestProfessional?.name ?? (preferredProfessionalId ? userMap.get(preferredProfessionalId)?.name ?? null : null)
+  const resolvedProfessionalName = preferredProfessionalId
+    ? (
+        await admin
+          .from('users')
+          .select('name')
+          .eq('id', preferredProfessionalId)
+          .maybeSingle()
+      ).data?.name ?? preferredProfessionalName
+    : preferredProfessionalName
 
   const currentStageIndex = stageOrder.indexOf(project.current_stage as (typeof stageOrder)[number])
   const workerInviteProject = (membersForProject ?? []).some(
@@ -177,29 +184,22 @@ export default async function ProjectDetailPage({
             </p>
           </div>
 
-          <div className="mt-2.5 flex items-start gap-3">
-            <div className="text-center">
-              <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
-                {initials(customer?.name ?? 'Customer')}
-              </div>
-              <p className="mt-1 text-[10px] text-gray-500">Customer</p>
-            </div>
-            <div className="text-center">
-              <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-[11px] font-semibold text-[#E8590C]">
-                {initials(contractor?.name ?? 'Contractor')}
-              </div>
-              <p className="mt-1 text-[10px] text-gray-500">Contractor</p>
-            </div>
-          </div>
           {isCustomer && preferredProfessionalId ? (
             <Link
+              prefetch={false}
               href={`/contractors/${preferredProfessionalId}?projectId=${project.id}`}
               className="mt-2.5 inline-flex rounded-md bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-600"
             >
               {preferredProfessionalRole === 'worker' ? 'Worker' : 'Contractor'}:{' '}
-              {preferredProfessionalName ?? 'View profile'} (Profile & Review)
+              {resolvedProfessionalName ?? 'View profile'} (Profile & Review)
             </Link>
           ) : null}
+          <Link
+            href={`/projects/${project.id}/images`}
+            className="mt-2.5 inline-flex rounded-md bg-[#E8590C] px-3 py-2 text-xs font-bold text-white hover:bg-orange-600"
+          >
+            View Project Images
+          </Link>
         </section>
 
         {!workerDetails && !workerInviteProject ? (

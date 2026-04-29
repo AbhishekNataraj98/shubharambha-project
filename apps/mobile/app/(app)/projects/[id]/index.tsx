@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Text, View } from 'react-native'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
+import { apiGet } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { useSessionState } from '@/lib/auth-state'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -19,6 +20,18 @@ type ProjectRow = {
   current_stage: string
   customer_id: string
   contractor_id: string | null
+}
+
+type ProjectProfessionalPayload = {
+  professional?: {
+    id: string
+    role: 'worker' | 'contractor' | null
+    name: string | null
+  } | null
+}
+
+type ContractorProfilePayload = {
+  name?: string
 }
 
 function ProjectDetailSkeleton() {
@@ -61,12 +74,13 @@ function ProjectDetailSkeleton() {
 
 export default function ProjectDetailScreen() {
   const { id, tab, updateId, paymentId, workerDetails } = useLocalSearchParams<{
-    id: string
+    id: string | string[]
     tab?: string
     updateId?: string
     paymentId?: string
     workerDetails?: string
   }>()
+  const projectId = Array.isArray(id) ? id[0] : id
   const { user, profile, loading: authLoading } = useSessionState()
   const [activeTab, setActiveTab] = useState<DetailTab>('updates')
   const [project, setProject] = useState<ProjectRow | null>(null)
@@ -81,86 +95,110 @@ export default function ProjectDetailScreen() {
   const [forbidden, setForbidden] = useState(false)
 
   const load = useCallback(async () => {
-    if (!id || !user?.id) return
-    setLoading(true)
-    setForbidden(false)
-    const { data: row, error } = await supabase
-      .from('projects')
-      .select('id,name,address,city,status,current_stage,customer_id,contractor_id')
-      .eq('id', id)
-      .maybeSingle()
-
-    if (error || !row) {
-      setProject(null)
+    if (!projectId || !user?.id) {
       setLoading(false)
       return
     }
+    setLoading(true)
+    setForbidden(false)
+    try {
+      const { data: row, error } = await supabase
+        .from('projects')
+        .select('id,name,address,city,status,current_stage,customer_id,contractor_id')
+        .eq('id', projectId)
+        .maybeSingle()
 
-    const p = row as ProjectRow
-    const { data: membersForProject = [] } = await supabase
-      .from('project_members')
-      .select('user_id,role')
-      .eq('project_id', p.id)
-    const memberProfessionalIds = membersForProject
-      .filter((member) => member.role === 'worker' || member.role === 'contractor')
-      .map((member) => member.user_id)
-    const relatedUserIds = Array.from(new Set([p.customer_id, p.contractor_id, ...memberProfessionalIds].filter(Boolean))) as string[]
-    const { data: usersData = [] } = relatedUserIds.length
-      ? await supabase.from('users').select('id,name').in('id', relatedUserIds)
-      : { data: [] as Array<{ id: string; name: string }> }
-
-    const isCustomer = p.customer_id === user.id
-    const isContractor = p.contractor_id === user.id
-    if (!isCustomer && !isContractor) {
-      const isMember = membersForProject.some((member) => member.user_id === user.id)
-      if (!isMember) {
-        setForbidden(true)
-        setLoading(false)
+      if (error || !row) {
+        setProject(null)
         return
       }
-    }
-    const hasAcceptedWorker = membersForProject.some(
-      (member) => member.user_id !== p.customer_id && member.role === 'worker'
-    )
-    const hasAcceptedProfessionalMember = membersForProject.some(
-      (member) => member.user_id !== p.customer_id && (member.role === 'worker' || member.role === 'contractor')
-    )
-    setWorkerInviteProject(hasAcceptedWorker)
-    setHasAcceptedProfessional(hasAcceptedProfessionalMember)
-    const preferredProfessional =
-      membersForProject.find((member) => member.user_id !== p.customer_id && member.role === 'worker') ??
-      membersForProject.find((member) => member.user_id !== p.customer_id && member.role === 'contractor') ??
-      null
-    const preferredProfessionalId = preferredProfessional?.user_id ?? p.contractor_id ?? null
-    const preferredProfessionalRole =
-      preferredProfessional?.role === 'worker' || preferredProfessional?.role === 'contractor'
-        ? preferredProfessional.role
-        : p.contractor_id
-          ? 'contractor'
-          : null
 
-    let cName = 'Customer'
-    let coName = 'Contractor'
-    if (usersData.length) {
-      const map = new Map(usersData.map((u) => [u.id, u.name]))
-      cName = map.get(p.customer_id) ?? 'Customer'
-      coName = p.contractor_id ? map.get(p.contractor_id) ?? 'Contractor' : 'Contractor'
-      if (preferredProfessionalId) {
-        setProfessionalName(map.get(preferredProfessionalId) ?? null)
-      } else {
-        setProfessionalName(null)
+      const p = row as ProjectRow
+      const { data: membersForProject = [] } = await supabase
+        .from('project_members')
+        .select('user_id,role')
+        .eq('project_id', p.id)
+      const memberProfessionalIds = membersForProject
+        .filter((member) => member.role === 'worker' || member.role === 'contractor')
+        .map((member) => member.user_id)
+      const relatedUserIds = Array.from(new Set([p.customer_id, p.contractor_id, ...memberProfessionalIds].filter(Boolean))) as string[]
+      const { data: usersData = [] } = relatedUserIds.length
+        ? await supabase.from('users').select('id,name').in('id', relatedUserIds)
+        : { data: [] as Array<{ id: string; name: string }> }
+
+      const isCustomer = p.customer_id === user.id
+      const isContractor = p.contractor_id === user.id
+      if (!isCustomer && !isContractor) {
+        const isMember = membersForProject.some((member) => member.user_id === user.id)
+        if (!isMember) {
+          setForbidden(true)
+          return
+        }
       }
-    } else {
-      setProfessionalName(null)
-    }
-    setProfessionalId(preferredProfessionalId)
-    setProfessionalRole(preferredProfessionalRole)
+      const hasAcceptedWorker = membersForProject.some(
+        (member) => member.user_id !== p.customer_id && member.role === 'worker'
+      )
+      const hasAcceptedProfessionalMember = membersForProject.some(
+        (member) => member.user_id !== p.customer_id && (member.role === 'worker' || member.role === 'contractor')
+      )
+      setWorkerInviteProject(hasAcceptedWorker)
+      setHasAcceptedProfessional(hasAcceptedProfessionalMember)
+      const preferredProfessional =
+        membersForProject.find((member) => member.user_id !== p.customer_id && member.role === 'worker') ??
+        membersForProject.find((member) => member.user_id !== p.customer_id && member.role === 'contractor') ??
+        null
+      const preferredProfessionalId = preferredProfessional?.user_id ?? p.contractor_id ?? null
+      const preferredProfessionalRole =
+        preferredProfessional?.role === 'worker' || preferredProfessional?.role === 'contractor'
+          ? preferredProfessional.role
+          : p.contractor_id
+            ? 'contractor'
+            : null
 
-    setProject(p)
-    setCustomerName(cName)
-    setContractorName(coName)
-    setLoading(false)
-  }, [id, user?.id])
+      let cName = 'Customer'
+      let coName = 'Contractor'
+      let resolvedProfessionalName: string | null = null
+      if (usersData.length) {
+        const map = new Map(usersData.map((u) => [u.id, u.name]))
+        cName = map.get(p.customer_id) ?? 'Customer'
+        coName = p.contractor_id ? map.get(p.contractor_id) ?? 'Contractor' : 'Contractor'
+        if (preferredProfessionalId) {
+          resolvedProfessionalName = map.get(preferredProfessionalId) ?? null
+        }
+      }
+      setProfessionalId(preferredProfessionalId)
+      setProfessionalRole(preferredProfessionalRole)
+      try {
+        const professionalPayload = await apiGet<ProjectProfessionalPayload>(`/api/projects/${p.id}/professional`)
+        const professional = professionalPayload.professional
+        if (professional?.id) {
+          setProfessionalId(professional.id)
+          setProfessionalRole(professional.role ?? preferredProfessionalRole)
+          if (professional.name) resolvedProfessionalName = professional.name
+        }
+      } catch {
+        // Fallback to local query result above.
+      }
+      // Final fallback: use existing contractor profile API, which reliably returns display name.
+      if (preferredProfessionalId && !resolvedProfessionalName) {
+        try {
+          const professionalProfile = await apiGet<ContractorProfilePayload>(
+            `/api/contractors/${encodeURIComponent(preferredProfessionalId)}`
+          )
+          if (professionalProfile.name) resolvedProfessionalName = professionalProfile.name
+        } catch {
+          // Keep previous fallback label when profile endpoint is unavailable.
+        }
+      }
+      setProfessionalName(resolvedProfessionalName)
+
+      setProject(p)
+      setCustomerName(cName)
+      setContractorName(coName)
+    } finally {
+        setLoading(false)
+    }
+  }, [projectId, user?.id])
 
   useEffect(() => {
     void load()
@@ -192,7 +230,7 @@ export default function ProjectDetailScreen() {
   if (!user) return <Redirect href="/(auth)/login" />
   if (!profile) return <Redirect href="/(auth)/register" />
   if (forbidden) return <Redirect href="/(app)/(tabs)" />
-  if (!id) return null
+  if (!projectId) return null
 
   if (loading) {
     return <ProjectDetailSkeleton />
@@ -224,17 +262,24 @@ export default function ProjectDetailScreen() {
     contractorName,
     professionalName:
       professionalName ??
-      (professionalRole === 'worker' ? 'Worker' : professionalRole === 'contractor' ? 'Contractor' : undefined),
+      (professionalRole === 'contractor'
+        ? contractorName !== 'Contractor'
+          ? contractorName
+          : undefined
+        : undefined),
     professionalRole,
     onPressProfessional:
       role === 'customer' && professionalId
         ? () => {
-            router.push({
+            router.navigate({
               pathname: '/contractors/[id]',
               params: { id: professionalId, projectId: project.id },
             })
           }
         : undefined,
+    onPressProjectImages: () => {
+      router.push({ pathname: '/projects/[id]/images', params: { id: project.id } })
+    },
     contractorAssigned: Boolean(project.contractor_id),
     hideStageTracker: workerDetails === '1' || workerInviteProject,
     showReportsTab: !(workerDetails === '1' || workerInviteProject),

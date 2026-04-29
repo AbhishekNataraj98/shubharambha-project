@@ -457,10 +457,7 @@ export default function ProfileTab() {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) Alert.alert('Error', error.message)
-    else {
-      await refreshProfile()
-      router.replace('/(auth)/login')
-    }
+    else await refreshProfile()
   }
 
   const deleteAccount = () => {
@@ -479,7 +476,6 @@ export default function ProfileTab() {
               await supabase.auth.signOut()
               await refreshProfile()
               Alert.alert('Account deleted', 'Your account has been deleted successfully.')
-              router.replace('/(auth)/login')
             } catch (error) {
               Alert.alert('Delete failed', error instanceof Error ? error.message : 'Unable to delete account')
             } finally {

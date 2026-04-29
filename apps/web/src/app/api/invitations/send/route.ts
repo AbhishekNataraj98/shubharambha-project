@@ -5,6 +5,8 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import type { TablesInsert } from '@/types/supabase'
 import type { Database } from '@/types/supabase'
 
+const INVITE_BLOCKING_PROJECT_STATUSES: Database['public']['Enums']['project_status'][] = ['active', 'on_hold']
+
 const sendInvitationSchema = z.object({
   project_id: z.string().uuid().optional(),
   contractor_id: z.string().uuid(),
@@ -62,6 +64,71 @@ export async function POST(request: Request) {
     .maybeSingle()
   if (!recipient || (recipient.role !== 'contractor' && recipient.role !== 'worker')) {
     return NextResponse.json({ error: 'Invite can only be sent to contractor or worker profiles' }, { status: 400 })
+  }
+
+  const { data: pendingInvites } = await admin
+    .from('enquiries')
+    .select('id,subject')
+    .eq('customer_id', user.id)
+    .eq('recipient_id', recipientId)
+    .eq('status', 'open')
+    .ilike('subject', 'Project invitation [%')
+    .order('created_at', { ascending: false })
+
+  if ((pendingInvites ?? []).length > 0) {
+    return NextResponse.json(
+      {
+        error: `Previous invitation is still pending with this ${recipient.role === 'worker' ? 'worker' : 'contractor'}.`,
+        pendingInvitations: pendingInvites ?? [],
+      },
+      { status: 400 }
+    )
+  }
+
+  if (!payload.project_id) {
+    if (recipient.role === 'contractor') {
+      const { data: activeProjects } = await admin
+        .from('projects')
+        .select('id,name,status')
+        .eq('customer_id', user.id)
+        .eq('contractor_id', recipientId)
+        .in('status', INVITE_BLOCKING_PROJECT_STATUSES)
+      if ((activeProjects ?? []).length >= 3) {
+        return NextResponse.json(
+          {
+            error: 'You already have 3 active projects with this contractor. Complete one to send a new invite.',
+            activeProjects: activeProjects ?? [],
+            limit: 3,
+          },
+          { status: 400 }
+        )
+      }
+    } else {
+      const { data: memberships } = await admin
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', recipientId)
+        .eq('role', 'worker')
+      const projectIds = Array.from(new Set((memberships ?? []).map((entry) => entry.project_id)))
+      const { data: activeProjects } = projectIds.length
+        ? await admin
+            .from('projects')
+            .select('id,name,status')
+            .in('id', projectIds)
+            .eq('customer_id', user.id)
+            .in('status', INVITE_BLOCKING_PROJECT_STATUSES)
+        : { data: [] as Array<{ id: string; name: string; status: string }> }
+      if ((activeProjects ?? []).length >= 1) {
+        return NextResponse.json(
+          {
+            error: 'You already have an active project with this worker. Complete it before sending another invite.',
+            activeProjects: activeProjects ?? [],
+            limit: 1,
+          },
+          { status: 400 }
+        )
+      }
+    }
   }
 
   let projectId: string

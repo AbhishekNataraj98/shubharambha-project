@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -27,7 +27,12 @@ const projectTypes: ProjectDraftInput['project_type'][] = ['Residential', 'Comme
 
 export default function NewProjectPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+  const [sendingInvite, setSendingInvite] = useState(false)
+  const invitedContractorId = searchParams.get('inviteTo')
+  const invitedContractorName = searchParams.get('inviteToName')
+  const isInviteMode = Boolean(invitedContractorId)
 
   const form = useForm<ProjectDraftInput>({
     resolver: zodResolver(projectDraftSchema),
@@ -78,6 +83,33 @@ export default function NewProjectPage() {
     router.push(`/contractors?city=${city}&projectDraft=true`)
   }
 
+  const onSubmitInvite = async (values: ProjectDraftInput) => {
+    if (!invitedContractorId) return
+    setSendingInvite(true)
+    try {
+      const response = await fetch('/api/invitations/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractor_id: invitedContractorId,
+          ...values,
+        }),
+      })
+      const payload = (await response.json()) as { error?: string }
+      if (!response.ok) {
+        form.setError('root', { message: payload.error ?? 'Failed to send invitation' })
+        return
+      }
+      sessionStorage.removeItem('projectDraft')
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      form.setError('root', { message: 'Failed to send invitation' })
+    } finally {
+      setSendingInvite(false)
+    }
+  }
+
   const canContinue =
     watchedName.trim().length > 1 &&
     watchedAddress.trim().length > 4 &&
@@ -90,16 +122,23 @@ export default function NewProjectPage() {
         <header className="mb-5 flex items-center gap-3">
           <h1 className="text-xl font-semibold text-gray-900">New Project</h1>
         </header>
+        {isInviteMode ? (
+          <p className="mb-3 text-sm text-gray-600">
+            Sending invitation to <span className="font-semibold text-gray-900">{invitedContractorName || 'selected contractor'}</span>
+          </p>
+        ) : null}
 
         <div className="mb-6 flex items-center gap-2 text-sm">
           <div className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-[#E8590C]">
             1. Project Details
           </div>
           <span className="text-gray-400">→</span>
-          <div className="rounded-full bg-gray-100 px-3 py-1 text-gray-500">2. Find Contractor</div>
+          <div className={`rounded-full px-3 py-1 ${isInviteMode ? 'bg-orange-100 text-[#E8590C] font-semibold' : 'bg-gray-100 text-gray-500'}`}>
+            {isInviteMode ? '2. Send Invite' : '2. Find Contractor'}
+          </div>
         </div>
 
-        <form onSubmit={form.handleSubmit(onFindContractor)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(isInviteMode ? onSubmitInvite : onFindContractor)} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-800">Building name*</label>
             <input
@@ -184,11 +223,12 @@ export default function NewProjectPage() {
 
           <Button
             type="submit"
-            disabled={!canContinue}
+            disabled={!canContinue || sendingInvite}
             className="mt-4 h-12 w-full rounded-lg bg-[#E8590C] text-base font-semibold text-white hover:bg-[#cf4e09]"
           >
-            Find Contractor
+            {isInviteMode ? (sendingInvite ? 'Sending Invite...' : 'Send Invite') : 'Find Contractor'}
           </Button>
+          {form.formState.errors.root?.message ? <p className="text-sm text-red-600">{form.formState.errors.root.message}</p> : null}
         </form>
       </div>
     </div>

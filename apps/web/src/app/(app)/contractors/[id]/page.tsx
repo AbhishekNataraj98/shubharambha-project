@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import ContractorProfileBackButton from '@/components/shared/contractor-profile-back-button'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import InviteContractorBar from '@/components/shared/invite-contractor-bar'
-import PortfolioGallery from '@/components/shared/portfolio-gallery'
 import ReviewInviteForm from '@/components/shared/review-invite-form'
 import type { Database } from '@/types/supabase'
+
+const INVITE_BLOCKING_STATUSES: Database['public']['Enums']['project_status'][] = ['active', 'on_hold']
 
 function initials(name: string) {
   return name
@@ -56,6 +58,7 @@ export default async function ContractorProfilePage({
   const query = await searchParams
   const showInviteBar = viewer?.role === 'customer'
   const projectId = query.projectId
+  const backHref = projectId ? `/projects/${projectId}` : '/contractors'
 
   const { data: contractor } = await admin
     .from('users')
@@ -83,49 +86,75 @@ export default async function ContractorProfilePage({
         ? (profileRecord.skill_tags as string[])
         : []
 
-  const serviceCities = Array.isArray(profileRecord.service_cities)
-    ? (profileRecord.service_cities as string[])
-    : Array.isArray(profileRecord.service_locations)
-      ? (profileRecord.service_locations as string[])
-      : []
-
   const yearsExperience = Number(profileRecord.years_experience ?? 0)
   const trade = contractor.role === 'worker'
     ? String(profileRecord.trade ?? (Array.isArray(profileRecord.skill_tags) ? profileRecord.skill_tags[0] : '') ?? '')
     : null
 
-  const { data: completedProjects } = await admin
-    .from('projects')
-    .select('id,name,city,status,current_stage')
-    .eq('contractor_id', contractor.id)
-    .eq('status', 'completed')
+  let contractorProjects: Array<{ id: string; name: string; city: string; status: string; current_stage: string }> = []
+  if (contractor.role === 'contractor') {
+    const { data: ownProjects } = await admin
+      .from('projects')
+      .select('id,name,city,status,current_stage')
+      .eq('contractor_id', contractor.id)
+    contractorProjects = ownProjects ?? []
+  } else {
+    const { data: workerMemberships } = await admin
+      .from('project_members')
+      .select('project_id')
+      .eq('user_id', contractor.id)
+      .eq('role', 'worker')
+    const workerProjectIds = Array.from(new Set((workerMemberships ?? []).map((entry) => entry.project_id)))
+    const { data: workerProjects } = workerProjectIds.length
+      ? await admin
+          .from('projects')
+          .select('id,name,city,status,current_stage')
+          .in('id', workerProjectIds)
+      : { data: [] as Array<{ id: string; name: string; city: string; status: string; current_stage: string }> }
+    contractorProjects = workerProjects ?? []
+  }
 
-  const completedIds = (completedProjects ?? []).map((project) => project.id)
-  const { data: completedUpdates } = completedIds.length
+  const completedProjects = contractorProjects.filter((project) => project.status === 'completed')
+  const ongoingProjects = contractorProjects.filter((project) => project.status === 'active')
+
+  const allProjectIds = contractorProjects.map((project) => project.id)
+  const { data: projectImages } = allProjectIds.length
     ? await admin
-        .from('daily_updates')
-        .select('project_id,photo_urls,created_at')
-        .in('project_id', completedIds)
-        .order('created_at', { ascending: true })
-    : { data: [] as Array<{ project_id: string; photo_urls: string[]; created_at: string }> }
+        .from('project_images')
+        .select('project_id,image_url,created_at')
+        .in('project_id', allProjectIds)
+        .order('created_at', { ascending: false })
+    : { data: [] as Array<{ project_id: string; image_url: string; created_at: string }> }
 
-  const photosByProject = new Map<string, string[]>()
-  for (const update of completedUpdates ?? []) {
-    const current = photosByProject.get(update.project_id) ?? []
-    const merged = [...current, ...(update.photo_urls ?? [])]
-    photosByProject.set(update.project_id, merged)
+  const firstImageByProject = new Map<string, string>()
+  for (const image of projectImages ?? []) {
+    if (!firstImageByProject.has(image.project_id) && image.image_url) {
+      firstImageByProject.set(image.project_id, image.image_url)
+    }
   }
 
   const portfolioProjects = (completedProjects ?? []).map((project) => {
-    const images = photosByProject.get(project.id) ?? []
     return {
       id: project.id,
       name: project.name,
       city: project.city,
-      thumbnail: images[0] ?? null,
-      images,
+      status: project.status,
+      thumbnail: firstImageByProject.get(project.id) ?? null,
     }
   })
+  const ongoingPortfolioProjects = (ongoingProjects ?? []).map((project) => {
+    return {
+      id: project.id,
+      name: project.name,
+      city: project.city,
+      status: project.status,
+      thumbnail: firstImageByProject.get(project.id) ?? null,
+    }
+  })
+  const allPortfolioProjects = [...ongoingPortfolioProjects, ...portfolioProjects]
+  const activeCitiesCount = new Set(
+    ongoingPortfolioProjects.map((project) => (project.city ?? '').trim()).filter(Boolean)
+  ).size
 
   const { data: reviews } = await admin
     .from('reviews')
@@ -146,47 +175,118 @@ export default async function ContractorProfilePage({
   const reviewedProjectMap = new Map((reviewedProjects ?? []).map((project) => [project.id, project.current_stage]))
 
   const reviewCount = (reviews ?? []).length
+  const hasExistingReviewForProject =
+    Boolean(projectId) &&
+    (reviews ?? []).some((review) => review.reviewer_id === user.id && review.project_id === projectId)
+  const existingReviewForProject =
+    projectId
+      ? (reviews ?? []).find((review) => review.reviewer_id === user.id && review.project_id === projectId) ?? null
+      : null
   const averageRating =
     reviewCount > 0
       ? Number(((reviews ?? []).reduce((sum, review) => sum + Number(review.rating), 0) / reviewCount).toFixed(1))
       : 0
 
+  let activeProjectsWithCustomer: Array<{ id: string; name: string; status: string }> = []
+  let pendingInvitationsWithProfessional: Array<{ id: string; subject: string; project_id: string | null }> = []
+  const inviteLimit = contractor.role === 'contractor' ? 3 : 1
+  if (viewer?.role === 'customer') {
+    if (contractor.role === 'contractor') {
+      const { data: activeProjects } = await admin
+        .from('projects')
+        .select('id,name,status')
+        .eq('customer_id', user.id)
+        .eq('contractor_id', contractor.id)
+        .in('status', INVITE_BLOCKING_STATUSES)
+      activeProjectsWithCustomer = (activeProjects ?? []).map((project) => ({
+        id: project.id,
+        name: project.name,
+        status: project.status,
+      }))
+    } else {
+      const { data: memberships } = await admin
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', contractor.id)
+        .eq('role', 'worker')
+      const projectIds = Array.from(new Set((memberships ?? []).map((entry) => entry.project_id)))
+      const { data: activeWorkerProjects } = projectIds.length
+        ? await admin
+            .from('projects')
+            .select('id,name,status')
+            .in('id', projectIds)
+            .eq('customer_id', user.id)
+            .in('status', INVITE_BLOCKING_STATUSES)
+        : { data: [] as Array<{ id: string; name: string; status: string }> }
+      activeProjectsWithCustomer = (activeWorkerProjects ?? []).map((project) => ({
+        id: project.id,
+        name: project.name,
+        status: project.status,
+      }))
+    }
+
+    const { data: pendingInvites } = await admin
+      .from('enquiries')
+      .select('id,subject')
+      .eq('customer_id', user.id)
+      .eq('recipient_id', contractor.id)
+      .eq('status', 'open')
+      .ilike('subject', 'Project invitation [%')
+      .order('created_at', { ascending: false })
+    pendingInvitationsWithProfessional = (pendingInvites ?? []).map((invite) => {
+      const projectIdMatch = invite.subject.match(/\[([0-9a-f-]{36})\]/i)
+      return {
+        id: invite.id,
+        subject: invite.subject,
+        project_id: projectIdMatch?.[1] ?? null,
+      }
+    })
+  }
+  const hasPendingInvitation = pendingInvitationsWithProfessional.length > 0
+  const inviteLimitReached = activeProjectsWithCustomer.length >= inviteLimit
+  const inviteLocked = hasPendingInvitation || inviteLimitReached
+  const inviteLockMessage = hasPendingInvitation
+    ? `Previous invitation is still pending with this ${contractor.role === 'worker' ? 'worker' : 'contractor'}.`
+    : inviteLimitReached
+      ? contractor.role === 'contractor'
+        ? 'You already have 3 active projects with this contractor. Complete one to send a new invite.'
+        : 'You already have an active project with this worker. Complete it before sending another invite.'
+    : null
+
   return (
     <div className="min-h-screen pb-32" style={{ backgroundColor: '#FAFAFA' }}>
-      {/* Gradient Hero Section */}
+      {/* Cream-orange hero — lighter than app header, matches mobile profile */}
       <div
+        className="border-t border-b px-4 py-8"
         style={{
-          background: 'linear-gradient(to right, #E8590C, #C44A0A)',
+          backgroundColor: '#FFFCF8',
+          borderTopColor: '#FFF3E8',
+          borderBottomColor: '#FFEAD8',
         }}
-        className="px-4 py-8 text-white"
       >
         <div className="mx-auto w-full max-w-md">
-          <Link href="/contractors" className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }} aria-label="Back">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-              <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2" />
-            </svg>
-          </Link>
+          <ContractorProfileBackButton projectId={projectId} fallbackHref={backHref} />
 
           <div className="flex items-end gap-4">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white bg-opacity-20 text-4xl font-bold text-white">
+            <div
+              className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full border-2 bg-white text-4xl font-bold"
+              style={{ borderColor: 'rgba(232, 89, 12, 0.35)', color: '#E8590C' }}
+            >
               {initials(contractor.name)}
             </div>
             <div className="pb-2">
-              <h1 className="text-2xl font-bold">{contractor.name}</h1>
-              <p className="mt-1 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
+              <h1 className="text-2xl font-bold text-gray-900">{contractor.name}</h1>
+              <p className="mt-1 text-sm font-medium text-stone-600">
                 {contractor.city} · {yearsExperience} years
               </p>
-              <p className="mt-1 text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.95)' }}>
+              <p className="mt-1 text-sm font-bold" style={{ color: '#E8590C' }}>
                 {contractor.role === 'contractor' ? 'Contractor' : trade || 'Worker'}
               </p>
-              <p className="mt-1 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.95)' }}>
+              <p className="mt-1 text-sm font-medium text-gray-600">
                 {contractor.phone_number ?? 'Phone not available'}
               </p>
-              <p className="mt-1 flex items-center gap-1 text-sm font-semibold">
-                {starText(averageRating)}{' '}
-                <span style={{ color: 'rgba(255,255,255,0.9)' }}>
-                  {averageRating.toFixed(1)} ({reviewCount})
-                </span>
+              <p className="mt-1 flex items-center gap-1 text-sm font-bold text-gray-900">
+                {starText(averageRating)} {averageRating.toFixed(1)} ({reviewCount})
               </p>
             </div>
           </div>
@@ -222,13 +322,21 @@ export default async function ContractorProfilePage({
         ) : null}
 
         {/* Stats Row */}
-        <section className="mb-6 grid grid-cols-3 gap-3">
+        <section className="mb-6 grid grid-cols-2 gap-3">
           <div className="rounded-lg bg-white p-4 text-center shadow-sm">
             <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
               {portfolioProjects.length}
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
               Projects Completed
+            </p>
+          </div>
+          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+              {ongoingPortfolioProjects.length}
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+              Ongoing Projects
             </p>
           </div>
           <div className="rounded-lg bg-white p-4 text-center shadow-sm">
@@ -241,21 +349,56 @@ export default async function ContractorProfilePage({
           </div>
           <div className="rounded-lg bg-white p-4 text-center shadow-sm">
             <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
-              {serviceCities.length}
+              {activeCitiesCount}
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-              Cities Served
+              Cities
             </p>
           </div>
         </section>
 
-        {/* Portfolio Section */}
-        {portfolioProjects.length > 0 && (
+        {/* Projects */}
+        {allPortfolioProjects.length > 0 && (
           <section className="mb-6">
             <h2 className="mb-4 text-lg font-bold" style={{ color: '#1A1A1A' }}>
-              Completed Projects
+              Projects
             </h2>
-            <PortfolioGallery projects={portfolioProjects} />
+            <div className="overflow-x-auto rounded-xl border border-orange-100 bg-[#FFF8F3] p-3 shadow-sm">
+              <div className="flex gap-3 pb-1">
+                {allPortfolioProjects.map((project) => (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}/images`}
+                    className="relative w-[210px] shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+                  >
+                    <span
+                      className={`absolute top-2 right-2 z-10 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        project.status === 'completed'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}
+                    >
+                      {project.status === 'completed' ? 'Completed' : 'Ongoing'}
+                    </span>
+                    <div className="relative h-32 bg-gray-100">
+                      {project.thumbnail ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={project.thumbnail} alt={project.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-3xl">🏗️</div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-black/35 px-2 py-1">
+                        <p className="text-[11px] font-semibold text-white">View Photos →</p>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">{project.name}</p>
+                      <p className="mt-1 text-xs text-gray-500">{project.city}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </section>
         )}
 
@@ -307,7 +450,16 @@ export default async function ContractorProfilePage({
 
         {viewer?.role === 'customer' && projectId ? (
           <section className="mt-6">
-            <ReviewInviteForm projectId={projectId} revieweeId={contractor.id} />
+            <ReviewInviteForm
+              projectId={projectId}
+              revieweeId={contractor.id}
+              hasExistingReview={hasExistingReviewForProject}
+              existingReview={
+                existingReviewForProject
+                  ? { rating: Number(existingReviewForProject.rating), comment: existingReviewForProject.comment }
+                  : null
+              }
+            />
           </section>
         ) : null}
       </div>
@@ -318,6 +470,12 @@ export default async function ContractorProfilePage({
           contractorName={contractor.name}
           contractorCity={contractor.city}
           projectId={projectId}
+          inviteLimit={inviteLimit}
+          inviteLimitReached={inviteLocked}
+          inviteLockMessage={inviteLockMessage}
+          activeProjects={activeProjectsWithCustomer}
+          hasPendingInvitation={hasPendingInvitation}
+          pendingInvitations={pendingInvitationsWithProfessional}
         />
       ) : null}
     </div>

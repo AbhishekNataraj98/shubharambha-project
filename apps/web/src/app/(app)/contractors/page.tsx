@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -36,8 +36,11 @@ function starText(avg: number) {
   return `${filled}${empty}`
 }
 
+const PROFILE_LINK_DEBOUNCE_MS = 600
+
 export default function ContractorsPage() {
   const searchParams = useSearchParams()
+  const lastProfileLinkAtRef = useRef(0)
   const [city, setCity] = useState(searchParams.get('city') ?? '')
   const [profileType, setProfileType] = useState<(typeof profilePills)[number]>('Contractor')
   const [isLoading, setIsLoading] = useState(false)
@@ -178,9 +181,18 @@ export default function ContractorsPage() {
               return (
                 <Link
                   key={contractor.id}
+                  prefetch={false}
                   href={`/contractors/${contractor.id}?projectDraft=${projectDraftMode ? 'true' : 'false'}${
                     projectId ? `&projectId=${projectId}` : ''
                   }`}
+                  onClick={(e) => {
+                    const now = Date.now()
+                    if (now - lastProfileLinkAtRef.current < PROFILE_LINK_DEBOUNCE_MS) {
+                      e.preventDefault()
+                      return
+                    }
+                    lastProfileLinkAtRef.current = now
+                  }}
                 >
                   <div className="flex items-start gap-4 rounded-lg bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
                     {/* Avatar */}

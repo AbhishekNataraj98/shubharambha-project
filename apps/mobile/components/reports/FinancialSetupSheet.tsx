@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -147,6 +148,7 @@ export function FinancialSetupSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
@@ -393,6 +395,7 @@ export function FinancialSetupSheet({
           </View>
         ) : null}
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

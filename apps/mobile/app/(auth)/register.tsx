@@ -12,6 +12,7 @@ import {
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { useSessionState } from '@/lib/auth-state'
+import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -156,7 +157,8 @@ export default function RegisterScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
       <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={styles.content}>
+        <KeyboardSafeView includeTopSafeArea iosHeaderOffset={8}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.topHeaderContainer}>
             <View style={styles.topHeader}>
               <Pressable
@@ -357,6 +359,7 @@ export default function RegisterScreen() {
             <Text style={styles.submitButtonText}>{submitting ? 'Creating profile...' : 'Create Profile'}</Text>
           </Pressable>
         </ScrollView>
+        </KeyboardSafeView>
       </SafeAreaView>
     </View>
   )

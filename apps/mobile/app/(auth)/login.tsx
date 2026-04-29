@@ -3,8 +3,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -14,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useState, useRef } from 'react'
 import { router } from 'expo-router'
+import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { supabase } from '@/lib/supabase'
 import type { TextInput as TextInputType } from 'react-native'
 
@@ -104,10 +103,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardSafeView style={styles.flex} includeTopSafeArea={false}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
@@ -236,7 +232,7 @@ export default function LoginScreen() {
             )}
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </SafeAreaView>
   )
 }

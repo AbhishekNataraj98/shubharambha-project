@@ -4,7 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   RefreshControl,
@@ -19,6 +19,7 @@ import { apiGet, apiPost } from '@/lib/api'
 import { chatDateSeparatorLabel, formatMessageTime, getInitials } from '@/lib/utils'
 import { uploadPhotoToWebApi } from '@/lib/uploadPhoto'
 import { ProjectHeroAndStage } from '@/components/project-detail/ProjectChrome'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { ChatMessage, DetailTab } from '@/components/project-detail/types'
 
 const BRAND = '#E8590C'
@@ -40,6 +41,7 @@ type ChatTabProps = {
     professionalName?: string
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
+    onPressProjectImages?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -47,6 +49,8 @@ type ChatTabProps = {
 }
 
 export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, onTabChange, listHeaderProps }: ChatTabProps) {
+  const insets = useSafeAreaInsets()
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const channelSuffixRef = useRef(Math.random().toString(36).slice(2))
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -126,10 +130,33 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
   }, [activeTab, loadMessages, projectId])
 
   useEffect(() => {
+    if (activeTab !== 'chat') {
+      setKeyboardHeight(0)
+      return
+    }
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const onShow = (e: { endCoordinates: { height: number } }) => setKeyboardHeight(e.endCoordinates.height)
+    const onHide = () => setKeyboardHeight(0)
+    const subShow = Keyboard.addListener(showEvt, onShow)
+    const subHide = Keyboard.addListener(hideEvt, onHide)
+    return () => {
+      subShow.remove()
+      subHide.remove()
+    }
+  }, [activeTab])
+
+  useEffect(() => {
     if (!loading && sortedAsc.length > 0) {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
     }
   }, [loading, sortedAsc.length])
+
+  useEffect(() => {
+    if (keyboardHeight > 0 && activeTab === 'chat') {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80)
+    }
+  }, [keyboardHeight, activeTab])
 
   const sendTextMessage = async () => {
     const content = input.trim()
@@ -203,6 +230,7 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
       professionalName={listHeaderProps.professionalName}
       professionalRole={listHeaderProps.professionalRole}
       onPressProfessional={listHeaderProps.onPressProfessional}
+      onPressProjectImages={listHeaderProps.onPressProjectImages}
       contractorAssigned={listHeaderProps.contractorAssigned}
       hideStageTracker={listHeaderProps.hideStageTracker}
       showReportsTab={listHeaderProps.showReportsTab}
@@ -220,8 +248,13 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
     )
   }
 
+  // iOS: lift composer by measured keyboard height. Android: rely on `softwareKeyboardLayoutMode: resize` so we
+  // only apply safe-area bottom; adding keyboard height there would double-shift with window resize.
+  const composerBottomPad =
+    Platform.OS === 'ios' ? (keyboardHeight > 0 ? keyboardHeight : insets.bottom) : insets.bottom
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={88}>
+    <View style={{ flex: 1 }}>
       {chrome}
       <FlatList
         ref={listRef}
@@ -291,7 +324,19 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
           )
         }}
       />
-      <View style={{ borderTopWidth: 1, borderTopColor: '#F3F4F6', backgroundColor: '#FFFFFF', padding: 10, flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: '#F3F4F6',
+          backgroundColor: '#FFFFFF',
+          paddingHorizontal: 10,
+          paddingTop: 10,
+          paddingBottom: composerBottomPad,
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: 8,
+        }}
+      >
         <TouchableOpacity onPress={() => void uploadAndSendPhoto()} disabled={uploadingImage} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 18 }}>📎</Text>
         </TouchableOpacity>
@@ -323,6 +368,6 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
           {previewImage ? <Image source={{ uri: previewImage }} style={{ width: '100%', height: '80%' }} resizeMode="contain" /> : null}
         </TouchableOpacity>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   )
 }

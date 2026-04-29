@@ -22,7 +22,8 @@
         "backgroundColor": "#E8590C"
       },
       "package": "com.shubharambha.app",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "plugins": [
       "expo-router",

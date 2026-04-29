@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   Text,
@@ -39,6 +41,7 @@ type PaymentsTabProps = {
     professionalName?: string
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
+    onPressProjectImages?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -247,6 +250,7 @@ export function PaymentsTab({
         professionalName={listHeaderProps.professionalName}
         professionalRole={listHeaderProps.professionalRole}
         onPressProfessional={listHeaderProps.onPressProfessional}
+      onPressProjectImages={listHeaderProps.onPressProjectImages}
         contractorAssigned={listHeaderProps.contractorAssigned}
         hideStageTracker={listHeaderProps.hideStageTracker}
         showReportsTab={listHeaderProps.showReportsTab}
@@ -504,6 +508,7 @@ export function PaymentsTab({
       </Modal>
 
       <Modal visible={Boolean(confirmDeclineId)} transparent animationType="fade">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 24 }}>
           <View style={{ borderRadius: 16, backgroundColor: '#FFFFFF', padding: 20 }}>
             <Text style={{ fontSize: 16, fontWeight: '700' }}>Decline payment</Text>
@@ -533,6 +538,7 @@ export function PaymentsTab({
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   )
@@ -625,6 +631,7 @@ function LogPaymentModal({
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
         <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: '#FFFFFF', padding: 16, maxHeight: '88%' }}>
@@ -712,6 +719,7 @@ function LogPaymentModal({
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

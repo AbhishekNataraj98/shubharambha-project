@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +16,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { apiPost } from '@/lib/api'
 import { uploadPhotoToWebApi } from '@/lib/uploadPhoto'
+import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 type ConstructionStage = 'foundation' | 'plinth' | 'walls' | 'slab' | 'plastering' | 'finishing'
@@ -109,7 +109,7 @@ export default function PostUpdateScreen() {
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 0.8,
     })
@@ -172,7 +172,7 @@ export default function PostUpdateScreen() {
 
   if (!authChecked) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#E8590C" />
         </View>
@@ -182,7 +182,7 @@ export default function PostUpdateScreen() {
 
   if (!allowed) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
         <View style={{ padding: 16 }}>
           <Text style={{ color: '#6B7280' }}>Access denied</Text>
         </View>
@@ -193,8 +193,8 @@ export default function PostUpdateScreen() {
   const BRAND = '#E8590C'
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
+      <KeyboardSafeView includeTopSafeArea={false} iosHeaderOffset={52}>
         <View
           style={{
             flexDirection: 'row',
@@ -354,7 +354,7 @@ export default function PostUpdateScreen() {
           </TouchableOpacity>
           {progressText ? <Text style={{ marginTop: 8, textAlign: 'center', fontSize: 12, color: '#6B7280' }}>{progressText}</Text> : null}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </SafeAreaView>
   )
 }

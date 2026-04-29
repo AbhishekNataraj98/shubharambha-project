@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -13,14 +13,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { Redirect, useRouter } from 'expo-router'
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSessionState } from '@/lib/auth-state'
+import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { PROJECT_DRAFT_STORAGE_KEY, type ProjectDraft } from '@/lib/projectDraft'
+import { apiPost } from '@/lib/api'
 
 const projectTypes = ['Residential', 'Commercial', 'Renovation'] as const
 
 export default function NewProjectScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams<{ inviteTo?: string; inviteToName?: string; inviteToCity?: string }>()
   const { loading, profile, user } = useSessionState()
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -30,6 +33,10 @@ export default function NewProjectScreen() {
   const [budget, setBudget] = useState('')
   const [startDate, setStartDate] = useState('')
   const [showStartDatePicker, setShowStartDatePicker] = useState(false)
+  const [sendingInvite, setSendingInvite] = useState(false)
+  const invitedContractorId = Array.isArray(params.inviteTo) ? params.inviteTo[0] : params.inviteTo
+  const invitedContractorName = Array.isArray(params.inviteToName) ? params.inviteToName[0] : params.inviteToName
+  const isInviteMode = Boolean(invitedContractorId)
 
   const canContinue = useMemo(
     () =>
@@ -73,6 +80,31 @@ export default function NewProjectScreen() {
     router.push({ pathname: '/search', params: { projectDraft: 'true' } })
   }
 
+  const onSendInvite = async () => {
+    if (!canContinue || !invitedContractorId) return
+    setSendingInvite(true)
+    try {
+      const payload = await apiPost<{ success?: boolean; error?: string }>('/api/invitations/send', {
+        contractor_id: invitedContractorId,
+        project_name: name.trim(),
+        address: address.trim(),
+        city: city.trim(),
+        pincode: pincode.trim(),
+        project_type: projectType,
+        estimated_budget: budget.trim() ? Number(budget.replace(/\D/g, '')) : undefined,
+        start_date: startDate.trim() || undefined,
+      })
+      if (!payload.success) throw new Error(payload.error ?? 'Failed to send invite')
+      await AsyncStorage.removeItem(PROJECT_DRAFT_STORAGE_KEY)
+      router.replace('/(app)/(tabs)')
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to send invite'
+      Alert.alert('Invite', message)
+    } finally {
+      setSendingInvite(false)
+    }
+  }
+
   const onStartDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS !== 'ios') {
       setShowStartDatePicker(false)
@@ -87,7 +119,7 @@ export default function NewProjectScreen() {
   const BORDER = '#E0D5CC'
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#FFFFFF' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardSafeView iosHeaderOffset={52} style={{ backgroundColor: '#FFFFFF' }}>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
         keyboardShouldPersistTaps="handled"
@@ -95,7 +127,11 @@ export default function NewProjectScreen() {
       >
         <View style={{ marginBottom: 14 }}>
           <Text style={{ fontSize: 24, fontWeight: '800', color: '#1A1A1A' }}>New Project</Text>
-          <Text style={{ marginTop: 4, fontSize: 13, color: '#78716C' }}>Enter project details to find professionals</Text>
+          <Text style={{ marginTop: 4, fontSize: 13, color: '#78716C' }}>
+            {isInviteMode
+              ? `Enter project details to send invite to ${invitedContractorName ?? 'selected contractor'}`
+              : 'Enter project details to find professionals'}
+          </Text>
         </View>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
@@ -103,8 +139,10 @@ export default function NewProjectScreen() {
             <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND }}>1. Details</Text>
           </View>
           <Text style={{ color: '#9CA3AF', alignSelf: 'center' }}>→</Text>
-          <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F3F4F6' }}>
-            <Text style={{ fontSize: 13, color: '#6B7280' }}>2. Find Contractor</Text>
+          <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: isInviteMode ? '#FFF4EE' : '#F3F4F6' }}>
+            <Text style={{ fontSize: 13, color: isInviteMode ? BRAND : '#6B7280', fontWeight: isInviteMode ? '700' : '400' }}>
+              {isInviteMode ? '2. Send Invite' : '2. Find Contractor'}
+            </Text>
           </View>
         </View>
 
@@ -177,18 +215,20 @@ export default function NewProjectScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() => void onFindContractor()}
-          disabled={!canContinue}
+          onPress={() => void (isInviteMode ? onSendInvite() : onFindContractor())}
+          disabled={!canContinue || sendingInvite}
           style={{
             marginTop: 20,
             minHeight: 52,
             borderRadius: 14,
-            backgroundColor: canContinue ? BRAND : '#D1D5DB',
+            backgroundColor: canContinue && !sendingInvite ? BRAND : '#D1D5DB',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16 }}>Find Contractor</Text>
+          <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16 }}>
+            {isInviteMode ? (sendingInvite ? 'Sending Invite...' : 'Send Invite') : 'Find Contractor'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -236,7 +276,7 @@ export default function NewProjectScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </KeyboardAvoidingView>
+    </KeyboardSafeView>
   )
 }
 

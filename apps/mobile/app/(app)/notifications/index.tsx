@@ -131,7 +131,7 @@ export default function NotificationsScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#E8590C" />
         </View>
@@ -143,7 +143,7 @@ export default function NotificationsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#E8590C" />
         </View>
@@ -152,7 +152,7 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
       <View
         style={{
           flexDirection: 'row',
