@@ -1,17 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '@/lib/supabase'
 import { useSessionState } from '@/lib/auth-state'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { formatPhoneIndian, getInitials } from '@/lib/utils'
-import { daysAgoText } from '@/lib/theme'
+import { formatPhoneIndian } from '@/lib/utils'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 import { InvitationActions } from '@/components/InvitationActions'
+import { uploadPhotoToWebApi } from '@/lib/uploadPhoto'
 
-const BRAND = '#E8590C'
+const BRAND = '#D85A30'
 const FG = '#1A1A1A'
 const MUTED = '#7A6F66'
+const inputStyle = {
+  minHeight: 40,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 10,
+  paddingHorizontal: 10,
+  backgroundColor: '#FFFFFF',
+} as const
 
 type UserRow = {
   id: string
@@ -21,17 +30,7 @@ type UserRow = {
   city: string | null
   pincode: string | null
   bio: string | null
-}
-
-type ProjectMini = {
-  id: string
-  name: string
-  address: string
-  city: string
-  current_stage: string
-  status: string
-  contractor_id: string | null
-  updated_at: string
+  profile_photo_url: string | null
 }
 
 type InviteRow = {
@@ -51,6 +50,27 @@ type PaymentApprovalRow = {
   created_at: string
   project_name: string
 }
+type ReviewRow = {
+  id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  reviewer_id: string
+  project_id: string
+}
+type ReviewDisplayRow = {
+  id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  reviewer_name: string
+  project_name: string
+}
+type ProfessionalImage = {
+  id: string
+  image_url: string
+  created_at: string
+}
 
 type SentInviteRecipientPayload = {
   items?: Array<{
@@ -67,20 +87,11 @@ function parseInviteSubject(subject: string) {
   return { projectId: match[1], projectName: match[2] }
 }
 
-const STAGE_PROGRESS: Record<string, number> = {
-  foundation: 10,
-  plinth: 25,
-  walls: 45,
-  slab: 60,
-  plastering: 80,
-  finishing: 100,
-}
-
 const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string; border: string }> = {
   pending: { bg: '#FEF3C7', text: '#92400E', label: 'Awaiting Contractor', border: '#F59E0B' },
   on_hold: { bg: '#FEF3C7', text: '#92400E', label: 'Awaiting Contractor', border: '#F59E0B' },
   active: { bg: '#D1FAE5', text: '#065F46', label: 'In Progress', border: '#10B981' },
-  completed: { bg: '#F3F4F6', text: '#374151', label: 'Completed', border: '#9CA3AF' },
+  completed: { bg: '#F2EDE8', text: '#374151', label: 'Completed', border: '#9CA3AF' },
   cancelled: { bg: '#FEE2E2', text: '#991B1B', label: 'Cancelled', border: '#EF4444' },
 }
 
@@ -102,16 +113,13 @@ export default function ProfileTab() {
   const notificationsChannelSuffixRef = useRef(Math.random().toString(36).slice(2))
   const [loading, setLoading] = useState(true)
   const [row, setRow] = useState<UserRow | null>(null)
-  const [specialisations, setSpecialisations] = useState<string[]>([])
   const [contractorYearsExperience, setContractorYearsExperience] = useState(0)
+  const [workerYearsExperience, setWorkerYearsExperience] = useState(0)
   const [trade, setTrade] = useState<string | null>(null)
   const [reviewsCount, setReviewsCount] = useState(0)
   const [avgRating, setAvgRating] = useState(0)
   const [projectsCompleted, setProjectsCompleted] = useState(0)
-  const [recentProjects, setRecentProjects] = useState<ProjectMini[]>([])
-  const [recentProjectHasMembers, setRecentProjectHasMembers] = useState<Map<string, boolean>>(new Map())
-  const [recentProjectHasWorkers, setRecentProjectHasWorkers] = useState<Map<string, boolean>>(new Map())
-  const [latestUpdateByProject, setLatestUpdateByProject] = useState<Map<string, string>>(new Map())
+  const [profileViews, setProfileViews] = useState(0)
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [receivedInvites, setReceivedInvites] = useState<InviteRow[]>([])
   const [sentInvites, setSentInvites] = useState<InviteRow[]>([])
@@ -122,13 +130,30 @@ export default function ProfileTab() {
   const [pendingPayments, setPendingPayments] = useState<PaymentApprovalRow[]>([])
   const [paymentActionId, setPaymentActionId] = useState<string | null>(null)
   const [invitationsY, setInvitationsY] = useState(0)
+  const [reviewsY, setReviewsY] = useState(0)
+  const [reviewItems, setReviewItems] = useState<ReviewDisplayRow[]>([])
+  const [professionalImages, setProfessionalImages] = useState<ProfessionalImage[]>([])
+  const [activeGalleryImageUri, setActiveGalleryImageUri] = useState<string | null>(null)
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [editPhotoUrl, setEditPhotoUrl] = useState('')
+  const [previewPhotoUri, setPreviewPhotoUri] = useState('')
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    uri: string
+    type: string
+    ext: string
+  } | null>(null)
+  const [editCity, setEditCity] = useState('')
+  const [editPincode, setEditPincode] = useState('')
+  const [editYearsExperience, setEditYearsExperience] = useState('')
 
   const load = useCallback(async () => {
     if (!user?.id) return
     setLoading(true)
     const { data: u, error } = await supabase
       .from('users')
-      .select('id,name,role,phone_number,city,pincode,bio')
+      .select('id,name,role,phone_number,city,pincode,bio,profile_photo_url')
       .eq('id', user.id)
       .maybeSingle()
     if (error || !u) {
@@ -137,6 +162,11 @@ export default function ProfileTab() {
       return
     }
     setRow(u as UserRow)
+    setEditPhotoUrl(u.profile_photo_url ?? '')
+    setPreviewPhotoUri(u.profile_photo_url ?? '')
+    setPendingPhoto(null)
+    setEditCity(u.city ?? '')
+    setEditPincode(u.pincode ?? '')
 
     const role = u.role
     if (role === 'contractor') {
@@ -148,15 +178,31 @@ export default function ProfileTab() {
           ? (rec.specialization as string[])
           : []
       setContractorYearsExperience(Number(rec.years_experience ?? 0))
-      setSpecialisations(specs)
+      setWorkerYearsExperience(0)
+      setEditYearsExperience(String(Number(rec.years_experience ?? 0)))
+      const { count } = await (supabase as any)
+        .from('professional_profile_views')
+        .select('id', { count: 'exact', head: true })
+        .eq('professional_id', user.id)
+      setProfileViews(count ?? 0)
     } else if (role === 'worker') {
       const { data: wp } = await supabase.from('worker_profiles').select('*').eq('user_id', user.id).maybeSingle()
       const rec = (wp ?? {}) as Record<string, unknown>
       setTrade(typeof rec.trade === 'string' ? rec.trade : null)
+      setWorkerYearsExperience(Number(rec.years_experience ?? 0))
+      setContractorYearsExperience(0)
+      setEditYearsExperience(String(Number(rec.years_experience ?? 0)))
+      const { count } = await (supabase as any)
+        .from('professional_profile_views')
+        .select('id', { count: 'exact', head: true })
+        .eq('professional_id', user.id)
+      setProfileViews(count ?? 0)
     } else {
-      setSpecialisations([])
       setTrade(null)
       setContractorYearsExperience(0)
+      setWorkerYearsExperience(0)
+      setEditYearsExperience('')
+      setProfileViews(0)
     }
 
     if (role === 'contractor' || role === 'worker') {
@@ -207,6 +253,12 @@ export default function ProfileTab() {
             project_name: projectNameById.get(p.project_id) ?? 'Project',
           }))
         )
+      }
+      try {
+        const galleryPayload = await apiGet<{ items?: ProfessionalImage[]; error?: string }>('/api/profile/images')
+        setProfessionalImages(galleryPayload.items ?? [])
+      } catch {
+        setProfessionalImages([])
       }
     } else if (role === 'customer') {
       const { data: invites } = await supabase
@@ -277,12 +329,42 @@ export default function ProfileTab() {
       setReceivedInvites([])
       setCustomerNames(new Map())
       setPendingPayments([])
+      setProfessionalImages([])
     }
 
-    const { data: revs } = await supabase.from('reviews').select('rating').eq('reviewee_id', user.id)
-    const rc = (revs ?? []).length
+    const { data: revs } = await supabase
+      .from('reviews')
+      .select('id,rating,comment,created_at,reviewer_id,project_id')
+      .eq('reviewee_id', user.id)
+      .order('created_at', { ascending: false })
+    const reviewRows = (revs ?? []) as ReviewRow[]
+    const rc = reviewRows.length
     setReviewsCount(rc)
-    setAvgRating(rc > 0 ? Number(((revs ?? []).reduce((s, r) => s + Number(r.rating), 0) / rc).toFixed(1)) : 0)
+    setAvgRating(rc > 0 ? Number((reviewRows.reduce((s, r) => s + Number(r.rating), 0) / rc).toFixed(1)) : 0)
+    if (role === 'contractor' || role === 'worker') {
+      const reviewerIds = Array.from(new Set(reviewRows.map((r) => r.reviewer_id)))
+      const projectIds = Array.from(new Set(reviewRows.map((r) => r.project_id)))
+      const { data: reviewerRows } = reviewerIds.length
+        ? await supabase.from('users').select('id,name').in('id', reviewerIds)
+        : { data: [] as Array<{ id: string; name: string }> }
+      const reviewerNameById = new Map((reviewerRows ?? []).map((r) => [r.id, r.name]))
+      const { data: projectRows } = projectIds.length
+        ? await supabase.from('projects').select('id,name').in('id', projectIds)
+        : { data: [] as Array<{ id: string; name: string }> }
+      const projectNameById = new Map((projectRows ?? []).map((p) => [p.id, p.name]))
+      setReviewItems(
+        reviewRows.map((r) => ({
+          id: r.id,
+          rating: Number(r.rating),
+          comment: r.comment,
+          created_at: r.created_at,
+          reviewer_name: reviewerNameById.get(r.reviewer_id) ?? 'Customer',
+          project_name: projectNameById.get(r.project_id) ?? 'Project',
+        }))
+      )
+    } else {
+      setReviewItems([])
+    }
 
     if (role === 'contractor') {
       const { data: done } = await supabase.from('projects').select('id').eq('contractor_id', user.id).eq('status', 'completed')
@@ -298,83 +380,6 @@ export default function ProfileTab() {
       setProjectsCompleted(0)
     }
 
-    let recent: ProjectMini[] = []
-    if (role === 'customer') {
-      const { data: rp } = await supabase
-        .from('projects')
-        .select('id,name,address,city,current_stage,status,contractor_id,updated_at,created_at')
-        .eq('customer_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      const ownedProjects = (rp ?? []) as ProjectMini[]
-      const ownedIds = ownedProjects.map((p) => p.id)
-      if (ownedIds.length > 0) {
-        const { data: members } = await supabase
-          .from('project_members')
-          .select('project_id,user_id,role')
-          .in('project_id', ownedIds)
-        const memberRows = (members ?? []) as Array<{ project_id: string; user_id: string; role: string | null }>
-        recent = ownedProjects
-          .filter((project) => {
-            if (project.contractor_id) {
-              return memberRows.some((m) => m.project_id === project.id && m.user_id === project.contractor_id)
-            }
-            return memberRows.some((m) => m.project_id === project.id && m.role === 'worker')
-          })
-          .slice(0, 3)
-      } else {
-        recent = []
-      }
-    } else if (role === 'contractor') {
-      const { data: rp } = await supabase
-        .from('projects')
-        .select('id,name,address,city,current_stage,status,contractor_id,updated_at,created_at')
-        .eq('contractor_id', user.id)
-        .in('status', ['active', 'completed'])
-        .order('created_at', { ascending: false })
-        .limit(3)
-      recent = (rp ?? []) as ProjectMini[]
-    } else {
-      const { data: mem } = await supabase.from('project_members').select('project_id').eq('user_id', user.id)
-      const ids = Array.from(new Set((mem ?? []).map((m) => m.project_id))).slice(0, 10)
-      if (ids.length) {
-        const { data: rp } = await supabase
-          .from('projects')
-          .select('id,name,address,city,current_stage,status,contractor_id,updated_at,created_at')
-          .in('id', ids)
-          .in('status', ['active', 'completed'])
-          .order('created_at', { ascending: false })
-          .limit(3)
-        recent = (rp ?? []) as ProjectMini[]
-      }
-    }
-    setRecentProjects(recent)
-    const recentIds = recent.map((p) => p.id)
-    const memberMap = new Map<string, boolean>()
-    const workerMap = new Map<string, boolean>()
-    if (recentIds.length) {
-      const { data: recentMembers } = await supabase.from('project_members').select('project_id,role').in('project_id', recentIds)
-      for (const member of recentMembers ?? []) {
-        memberMap.set(member.project_id, true)
-        if (member.role === 'worker') workerMap.set(member.project_id, true)
-      }
-    }
-    setRecentProjectHasMembers(memberMap)
-    setRecentProjectHasWorkers(workerMap)
-
-    const pids = recentIds
-    const map = new Map<string, string>()
-    if (pids.length) {
-      const { data: ups } = await supabase
-        .from('daily_updates')
-        .select('project_id,created_at')
-        .in('project_id', pids)
-        .order('created_at', { ascending: false })
-      for (const up of ups ?? []) {
-        if (!map.has(up.project_id)) map.set(up.project_id, up.created_at)
-      }
-    }
-    setLatestUpdateByProject(map)
     setLoading(false)
   }, [user?.id])
 
@@ -454,8 +459,21 @@ export default function ProfileTab() {
 
   const scrollRef = useRef<ScrollView>(null)
 
-  const signOut = async () => {
+  const signOutWithNetworkFallback = async () => {
     const { error } = await supabase.auth.signOut()
+    if (!error) return { error: null as null | Error }
+
+    const isTransientNetworkFailure = /network request failed/i.test(error.message)
+    if (!isTransientNetworkFailure) return { error: new Error(error.message) }
+
+    // If revoke fails due to a flaky network, still clear local session so the app can log out cleanly.
+    const { error: localError } = await supabase.auth.signOut({ scope: 'local' })
+    if (localError) return { error: new Error(localError.message) }
+    return { error: null as null | Error }
+  }
+
+  const signOut = async () => {
+    const { error } = await signOutWithNetworkFallback()
     if (error) Alert.alert('Error', error.message)
     else await refreshProfile()
   }
@@ -473,7 +491,8 @@ export default function ProfileTab() {
             try {
               setDeletingAccount(true)
               await apiDelete('/api/account')
-              await supabase.auth.signOut()
+              const { error } = await signOutWithNetworkFallback()
+              if (error) throw error
               await refreshProfile()
               Alert.alert('Account deleted', 'Your account has been deleted successfully.')
             } catch (error) {
@@ -485,6 +504,148 @@ export default function ProfileTab() {
         },
       ]
     )
+  }
+
+  const pickProfilePhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Please allow photo access to update your profile picture.')
+        return
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+      })
+      if (result.canceled || !result.assets[0]) return
+      const asset = result.assets[0]
+      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
+      const normalizedExt = ext === 'jpeg' ? 'jpg' : ext
+      const mimeType = asset.mimeType ?? `image/${normalizedExt === 'jpg' ? 'jpeg' : normalizedExt}`
+      setPendingPhoto({
+        uri: asset.uri,
+        type: mimeType,
+        ext: normalizedExt,
+      })
+      setPreviewPhotoUri(asset.uri)
+    } catch (error) {
+      Alert.alert('Profile photo', error instanceof Error ? error.message : 'Failed to upload photo')
+    }
+  }
+
+  const saveProfileEdits = async () => {
+    try {
+      setSavingProfile(true)
+      let nextPhotoUrl = editPhotoUrl.trim() || null
+      if (pendingPhoto) {
+        setUploadingPhoto(true)
+        nextPhotoUrl = await uploadPhotoToWebApi({
+          uri: pendingPhoto.uri,
+          name: `profile-${user?.id ?? 'user'}-${Date.now()}.${pendingPhoto.ext}`,
+          type: pendingPhoto.type,
+          folder: 'profile',
+        })
+      }
+      const payload: Record<string, unknown> = {
+        profile_photo_url: nextPhotoUrl,
+        city: editCity.trim() || null,
+        pincode: editPincode.trim() || null,
+      }
+      if (row?.role === 'contractor') {
+        payload.contractor = {
+          years_experience: Number(editYearsExperience || 0),
+        }
+      }
+      if (row?.role === 'worker') {
+        payload.worker = {
+          years_experience: Number(editYearsExperience || 0),
+        }
+      }
+      const res = await apiPost<{ success?: boolean; error?: string }>('/api/account/profile', payload)
+      if (!res.success) throw new Error(res.error ?? 'Unable to save profile')
+      setEditPhotoUrl(nextPhotoUrl ?? '')
+      setPreviewPhotoUri(nextPhotoUrl ?? '')
+      setPendingPhoto(null)
+      setEditingProfile(false)
+      await refreshProfile()
+      await load()
+      Alert.alert('Saved', 'Your profile has been updated.')
+    } catch (error) {
+      Alert.alert('Save failed', error instanceof Error ? error.message : 'Unable to update profile')
+    } finally {
+      setUploadingPhoto(false)
+      setSavingProfile(false)
+    }
+  }
+
+  const onToggleEditProfile = () => {
+    if (editingProfile) {
+      setEditPhotoUrl(row.profile_photo_url ?? '')
+      setPreviewPhotoUri(row.profile_photo_url ?? '')
+      setPendingPhoto(null)
+      setEditCity(row.city ?? '')
+      setEditPincode(row.pincode ?? '')
+      if (row.role === 'contractor') {
+        setEditYearsExperience(String(contractorYearsExperience))
+      } else if (row.role === 'worker') {
+        setEditYearsExperience(String(workerYearsExperience))
+      } else {
+        setEditYearsExperience('')
+      }
+    }
+    setEditingProfile((prev) => !prev)
+  }
+
+  const scrollToReviews = () => {
+    if (!reviewsY) return
+    scrollRef.current?.scrollTo({ y: Math.max(reviewsY - 24, 0), animated: true })
+  }
+
+  const addProfessionalImage = async () => {
+    if (professionalImages.length >= 6) {
+      Alert.alert('Limit reached', '6 images limit reached delete existing to upload new')
+      return
+    }
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Please allow photo access to add profile images.')
+        return
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+      })
+      if (result.canceled || !result.assets[0]) return
+      const asset = result.assets[0]
+      const ext = (asset.uri.split('.').pop() || 'jpg').toLowerCase()
+      const normalizedExt = ext === 'jpeg' ? 'jpg' : ext
+      setUploadingPhoto(true)
+      const url = await uploadPhotoToWebApi({
+        uri: asset.uri,
+        name: `gallery-${user?.id ?? 'user'}-${Date.now()}.${normalizedExt}`,
+        type: asset.mimeType ?? `image/${normalizedExt === 'jpg' ? 'jpeg' : normalizedExt}`,
+        folder: 'professional-gallery',
+      })
+      const saved = await apiPost<{ success?: boolean; error?: string; item?: ProfessionalImage }>('/api/profile/images', {
+        image_url: url,
+      })
+      if (!saved.success || !saved.item) throw new Error(saved.error ?? 'Unable to save image')
+      setProfessionalImages((prev) => [...prev, saved.item as ProfessionalImage])
+    } catch (error) {
+      Alert.alert('Image upload', error instanceof Error ? error.message : 'Unable to upload image')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  const deleteProfessionalImage = async (id: string) => {
+    try {
+      await apiDelete(`/api/profile/images/${id}`)
+      setProfessionalImages((prev) => prev.filter((item) => item.id !== id))
+    } catch (error) {
+      Alert.alert('Delete image', error instanceof Error ? error.message : 'Unable to delete image')
+    }
   }
 
   const respondToPaymentApproval = async (payment: PaymentApprovalRow, action: 'approve' | 'decline') => {
@@ -505,7 +666,7 @@ export default function ProfileTab() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -517,7 +678,7 @@ export default function ProfileTab() {
 
   if (loading || !row) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -526,13 +687,17 @@ export default function ProfileTab() {
   }
 
   const showStats = row.role === 'contractor' || row.role === 'worker'
-  const recentScrollable = recentProjects.length > 2
-  const receivedScrollable = receivedInvites.length > 2
-  const sentScrollable = sentInvites.length > 2
+  const receivedInvitesForDisplay = receivedInvites.filter((invite) => invite.status !== 'responded')
+  const sentInvitesForDisplay = sentInvites.filter((invite) => {
+    const approvedByMembership = sentInviteApproved.get(invite.id) === true
+    return invite.status !== 'responded' && !approvedByMembership
+  })
+  const receivedScrollable = receivedInvitesForDisplay.length > 2
+  const sentScrollable = sentInvitesForDisplay.length > 2
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['bottom']}>
-      <ScrollView ref={scrollRef} nestedScrollEnabled contentContainerStyle={{ paddingBottom: 40 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['bottom']}>
+      <ScrollView ref={scrollRef} nestedScrollEnabled contentContainerStyle={{ paddingBottom: 12 }}>
         <View style={{ alignItems: 'center', marginTop: 16 }}>
           <View
             style={{
@@ -544,10 +709,23 @@ export default function ProfileTab() {
               backgroundColor: BRAND,
               alignItems: 'center',
               justifyContent: 'center',
+              overflow: 'hidden',
             }}
           >
-            <Text style={{ fontSize: 28, fontWeight: '800', color: '#FFFFFF' }}>{getInitials(row.name)}</Text>
+            {previewPhotoUri ? (
+              <Image source={{ uri: previewPhotoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            ) : (
+              <Text style={{ fontSize: 28, fontWeight: '800', color: '#FFFFFF' }}>
+                {row.name?.trim()?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            )}
           </View>
+          <TouchableOpacity
+            onPress={onToggleEditProfile}
+            style={{ marginTop: 10, borderRadius: 999, backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA', paddingHorizontal: 12, paddingVertical: 6 }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#C2410C' }}>{editingProfile ? 'Cancel edit' : 'Edit profile'}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={{ paddingHorizontal: 16, marginTop: 12, alignItems: 'center' }}>
@@ -564,32 +742,137 @@ export default function ProfileTab() {
         {showStats ? (
           <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 20 }}>
             <StatBox label="Rating" value={avgRating.toFixed(1)} />
-            <StatBox label="Reviews" value={String(reviewsCount)} />
             <StatBox label="Completed" value={String(projectsCompleted)} />
+            <StatBox label="Profile views" value={String(profileViews)} />
           </View>
         ) : null}
 
-        <View style={{ marginHorizontal: 16, marginTop: 20, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 16, borderWidth: 1, borderColor: '#F3F4F6' }}>
-          {row.bio ? <Text style={{ fontSize: 14, color: '#4B5563', lineHeight: 20 }}>{row.bio}</Text> : <Text style={{ color: MUTED }}>No bio yet</Text>}
-        </View>
+        {editingProfile ? (
+          <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>EDIT PROFILE</Text>
+            <TouchableOpacity
+              onPress={() => void pickProfilePhoto()}
+              disabled={uploadingPhoto}
+              style={{ marginTop: 10, minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#C2410C', fontWeight: '700' }}>{uploadingPhoto ? 'Uploading...' : 'Change profile photo'}</Text>
+            </TouchableOpacity>
+            {(row.role === 'contractor' || row.role === 'worker') ? (
+              <>
+                <Text style={{ marginTop: 10, marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Years experience</Text>
+                <TextInput
+                  value={editYearsExperience}
+                  onChangeText={(t) => setEditYearsExperience(t.replace(/[^\d]/g, ''))}
+                  keyboardType="number-pad"
+                  style={inputStyle}
+                />
+              </>
+            ) : null}
 
-        {specialisations.length > 0 ? (
-          <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
-            <Text style={{ fontWeight: '700', marginBottom: 8, color: FG }}>Specialisations</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {specialisations.map((s) => (
-                <View key={s} style={{ borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFEDD5' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: BRAND }}>{s}</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>City</Text>
+                <TextInput value={editCity} onChangeText={setEditCity} style={inputStyle} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Pincode</Text>
+                <TextInput
+                  value={editPincode}
+                  onChangeText={(t) => setEditPincode(t.replace(/[^\d]/g, '').slice(0, 6))}
+                  keyboardType="number-pad"
+                  style={inputStyle}
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => void saveProfileEdits()}
+              disabled={savingProfile || uploadingPhoto}
+              style={{ marginTop: 14, minHeight: 46, borderRadius: 10, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center', opacity: savingProfile || uploadingPhoto ? 0.7 : 1 }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{savingProfile ? 'Saving...' : 'Save profile'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {row.role === 'contractor' || row.role === 'worker' ? (
+          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+            <Text style={{ color: MUTED }}>
+              {(row.role === 'contractor' ? contractorYearsExperience : workerYearsExperience)} years of experience
+            </Text>
+          </View>
+        ) : null}
+
+        {(row.role === 'contractor' || row.role === 'worker') ? (
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 12,
+              borderRadius: 16,
+              backgroundColor: '#FFFFFF',
+              padding: 14,
+              borderWidth: 1,
+              borderColor: '#FFEDD5',
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>PROFILE IMAGES</Text>
+              <TouchableOpacity
+                onPress={() => void addProfessionalImage()}
+                disabled={uploadingPhoto}
+                style={{ borderRadius: 999, borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', paddingHorizontal: 10, paddingVertical: 6, opacity: uploadingPhoto ? 0.7 : 1 }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#C2410C' }}>
+                  {uploadingPhoto ? 'Uploading...' : '+ Add image'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 }}>
+              {professionalImages.map((item) => (
+                <View
+                  key={item.id}
+                  style={{
+                    width: '32%',
+                    height: 108,
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    backgroundColor: '#FFF7ED66',
+                    borderWidth: 1,
+                    borderColor: '#FFEDD5',
+                  }}
+                >
+                  <TouchableOpacity onPress={() => setActiveGalleryImageUri(item.image_url)} activeOpacity={0.9}>
+                    <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => void deleteProfessionalImage(item.id)}
+                    style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800', lineHeight: 16 }}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {Array.from({ length: Math.max(0, 6 - professionalImages.length) }).map((_, index) => (
+                <View
+                  key={`placeholder-${index}`}
+                  style={{
+                    width: '32%',
+                    height: 108,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#FFEDD5',
+                    backgroundColor: '#FFF7ED66',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#FDBA74' }}>
+                    {`Image ${professionalImages.length + index + 1}`}
+                  </Text>
                 </View>
               ))}
             </View>
-          </View>
-        ) : null}
-
-        {row.role === 'contractor' ? (
-          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-            <Text style={{ fontWeight: '700', color: FG }}>Years of experience</Text>
-            <Text style={{ marginTop: 6, color: MUTED }}>{contractorYearsExperience} years</Text>
+            <Text style={{ marginTop: 10, fontSize: 11, color: '#9CA3AF' }}>{`${professionalImages.length}/6 images`}</Text>
           </View>
         ) : null}
 
@@ -602,92 +885,13 @@ export default function ProfileTab() {
           </View>
         ) : null}
 
-        {recentProjects.length > 0 ? (
-          <View style={{ marginTop: 20 }}>
-            <Text style={{ paddingHorizontal: 16, fontWeight: '800', fontSize: 16, color: FG }}>Recent projects</Text>
-            <ScrollView
-              nestedScrollEnabled
-              scrollEnabled={recentScrollable}
-              showsVerticalScrollIndicator={recentScrollable}
-              style={{ height: recentScrollable ? 320 : undefined, marginTop: 12 }}
-              contentContainerStyle={{ paddingHorizontal: 16 }}
-            >
-              {recentProjects.map((p) => {
-                const effectiveStatus =
-                  (p.status === 'pending' || p.status === 'on_hold') &&
-                  (row.role !== 'customer' || recentProjectHasMembers.get(p.id))
-                    ? 'active'
-                    : p.status
-                const status = STATUS_CONFIG[effectiveStatus] ?? STATUS_CONFIG.active
-                const statusLabel =
-                  effectiveStatus === 'pending' || effectiveStatus === 'on_hold'
-                    ? p.contractor_id
-                      ? 'Waiting contractor approval'
-                      : 'Waiting worker approval'
-                    : status.label
-                const hideStagePill = recentProjectHasWorkers.get(p.id) === true
-                const stage = STAGE_COLORS[p.current_stage] ?? STAGE_COLORS.foundation
-                const progress = STAGE_PROGRESS[p.current_stage] ?? 10
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    onPress={() => router.push({ pathname: '/projects/[id]', params: { id: p.id } })}
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: 18,
-                      padding: 16,
-                      marginBottom: 12,
-                      borderLeftWidth: 4,
-                      borderLeftColor: status.border,
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 8,
-                      elevation: 3,
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '700', color: '#1C1917', flex: 1, marginRight: 8 }}>
-                        {p.name}
-                      </Text>
-                      {!hideStagePill ? (
-                        <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: stage.bg }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', textTransform: 'capitalize', color: stage.text }}>
-                            {p.current_stage}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-
-                    <Text style={{ fontSize: 13, color: '#78716C', marginBottom: 12 }}>📍 {p.city}</Text>
-
-                    <View style={{ height: 5, backgroundColor: '#F5F5F4', borderRadius: 3, marginBottom: 10, overflow: 'hidden' }}>
-                      <View style={{ height: 5, backgroundColor: BRAND, borderRadius: 3, width: `${progress}%` as any }} />
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: status.bg }}>
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: status.text }}>{statusLabel}</Text>
-                      </View>
-                      <Text style={{ fontSize: 11, color: '#A8A29E' }}>
-                        {progress}% · {daysAgoText(latestUpdateByProject.get(p.id) ?? p.updated_at)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )
-              })}
-            </ScrollView>
-          </View>
-        ) : null}
-
-        {receivedInvites.length > 0 ? (
+        {receivedInvitesForDisplay.length > 0 ? (
           <View
             onLayout={(e) => {
               const y = e.nativeEvent.layout.y
               setInvitationsY(y)
             }}
-            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F3F4F6' }}
+            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}
           >
             <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>WORK INVITATIONS</Text>
             <ScrollView
@@ -697,7 +901,7 @@ export default function ProfileTab() {
               style={{ height: receivedScrollable ? 280 : undefined, marginTop: 2 }}
               contentContainerStyle={{ paddingBottom: 6 }}
             >
-              {receivedInvites.map((invite) => {
+              {receivedInvitesForDisplay.map((invite) => {
                 const parsed = parseInviteSubject(invite.subject)
                 const pending = invite.status === 'open'
                 const statusLabel = pending ? 'Pending your response' : invite.status === 'responded' ? 'Approved' : 'Declined'
@@ -738,13 +942,13 @@ export default function ProfileTab() {
           </View>
         ) : null}
 
-        {sentInvites.length > 0 ? (
+        {sentInvitesForDisplay.length > 0 ? (
           <View
             onLayout={(e) => {
               const y = e.nativeEvent.layout.y
               setInvitationsY((prev) => (prev === 0 ? y : prev))
             }}
-            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F3F4F6' }}
+            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}
           >
             <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>INVITATIONS SENT</Text>
             <ScrollView
@@ -754,7 +958,7 @@ export default function ProfileTab() {
               style={{ height: sentScrollable ? 280 : undefined, marginTop: 2 }}
               contentContainerStyle={{ paddingBottom: 6 }}
             >
-              {sentInvites.map((invite) => {
+              {sentInvitesForDisplay.map((invite) => {
                   const parsed = parseInviteSubject(invite.subject)
                   const rec = invite.recipient_id ? recipientMap.get(invite.recipient_id) : undefined
                   const approvedByMembership = sentInviteApproved.get(invite.id) === true
@@ -828,7 +1032,7 @@ export default function ProfileTab() {
         ) : null}
 
         {pendingPayments.length > 0 ? (
-          <View style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F3F4F6' }}>
+          <View style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}>
             <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>PAYMENT APPROVAL REQUESTS</Text>
             {pendingPayments.map((payment) => (
               <View
@@ -880,11 +1084,51 @@ export default function ProfileTab() {
           </View>
         ) : null}
 
+        {(row.role === 'contractor' || row.role === 'worker') ? (
+          <View
+            onLayout={(e) => {
+              setReviewsY(e.nativeEvent.layout.y)
+            }}
+            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>REVIEWS</Text>
+            {reviewItems.length === 0 ? (
+              <Text style={{ marginTop: 10, color: MUTED, fontSize: 13 }}>No reviews yet.</Text>
+            ) : (
+              reviewItems.map((review) => (
+                <View
+                  key={review.id}
+                  style={{
+                    marginTop: 10,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                    backgroundColor: '#FFFFFF',
+                    borderLeftWidth: 4,
+                    borderLeftColor: '#D85A30',
+                    padding: 12,
+                  }}
+                >
+                  <Text style={{ fontWeight: '800', color: FG, fontSize: 14 }}>{review.project_name}</Text>
+                  <Text style={{ marginTop: 4, color: '#B45309', fontSize: 12, fontWeight: '700' }}>
+                    {`★ ${review.rating.toFixed(1)} · by ${review.reviewer_name}`}
+                  </Text>
+                  {review.comment ? (
+                    <Text style={{ marginTop: 6, color: MUTED, fontSize: 13 }}>{review.comment}</Text>
+                  ) : (
+                    <Text style={{ marginTop: 6, color: '#9CA3AF', fontSize: 12 }}>No written comment</Text>
+                  )}
+                </View>
+              ))
+            )}
+          </View>
+        ) : null}
+
         <TouchableOpacity
           onPress={() => void signOut()}
           style={{
             marginHorizontal: 16,
-            marginTop: 28,
+            marginTop: 16,
             minHeight: 52,
             borderRadius: 14,
             borderWidth: 2,
@@ -900,7 +1144,7 @@ export default function ProfileTab() {
           disabled={deletingAccount}
           style={{
             marginHorizontal: 16,
-            marginTop: 12,
+            marginTop: 10,
             minHeight: 52,
             borderRadius: 14,
             borderWidth: 2,
@@ -915,15 +1159,44 @@ export default function ProfileTab() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+      <Modal
+        visible={Boolean(activeGalleryImageUri)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActiveGalleryImageUri(null)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onPress={() => setActiveGalleryImageUri(null)}
+        >
+          {activeGalleryImageUri ? (
+            <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420 }}>
+              <Image source={{ uri: activeGalleryImageUri }} style={{ width: '100%', height: 460, borderRadius: 16 }} resizeMode="contain" />
+              <TouchableOpacity
+                onPress={() => setActiveGalleryImageUri(null)}
+                style={{ position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 18, lineHeight: 20 }}>×</Text>
+              </TouchableOpacity>
+            </Pressable>
+          ) : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   )
 }
 
-function StatBox({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ flex: 1, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6' }}>
+function StatBox({ label, value, onPress }: { label: string; value: string; onPress?: () => void }) {
+  const content = (
+    <View style={{ flex: 1, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#F2EDE8' }}>
       <Text style={{ fontSize: 20, fontWeight: '800', color: BRAND }}>{value}</Text>
       <Text style={{ marginTop: 6, fontSize: 11, fontWeight: '600', color: MUTED }}>{label}</Text>
     </View>
+  )
+  if (!onPress) return content
+  return (
+    <TouchableOpacity onPress={onPress} style={{ flex: 1 }}>
+      {content}
+    </TouchableOpacity>
   )
 }

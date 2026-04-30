@@ -122,7 +122,7 @@ export default function InviteContractorBar({
           onClick={sendInvite}
           disabled={isLoading}
           className="flex-shrink-0 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-60 hover:opacity-90"
-          style={{ backgroundColor: inviteLimitReached ? '#9CA3AF' : '#E8590C' }}
+          style={{ backgroundColor: inviteLimitReached ? '#9CA3AF' : '#D85A30' }}
         >
           {isLoading ? 'Sending...' : inviteLimitReached ? 'Locked' : 'Send'}
         </button>

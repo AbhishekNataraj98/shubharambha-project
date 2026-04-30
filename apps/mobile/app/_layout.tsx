@@ -29,7 +29,7 @@ export default function RootLayout() {
         justifyContent: 'center',
         backgroundColor: '#FFF8F5',
       }}>
-        <ActivityIndicator size="large" color="#E8590C" />
+        <ActivityIndicator size="large" color="#D85A30" />
       </View>
     )
   }

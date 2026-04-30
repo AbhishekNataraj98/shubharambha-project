@@ -7,6 +7,7 @@ type Profile = {
   name: string
   role: string
   city: string | null
+  profile_photo_url: string | null
 }
 
 type SessionState = {
@@ -18,7 +19,11 @@ type SessionState = {
 }
 
 async function fetchProfile(userId: string) {
-  const { data } = await supabase.from('users').select('id,name,role,city').eq('id', userId).maybeSingle()
+  const { data } = await supabase
+    .from('users')
+    .select('id,name,role,city,profile_photo_url')
+    .eq('id', userId)
+    .maybeSingle()
   return data ?? null
 }
 

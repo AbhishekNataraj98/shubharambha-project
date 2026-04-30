@@ -131,9 +131,9 @@ export default function NotificationsScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         </View>
       </SafeAreaView>
     )
@@ -143,16 +143,16 @@ export default function NotificationsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         </View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right', 'bottom']}>
       <View
         style={{
           flexDirection: 'row',
@@ -161,20 +161,20 @@ export default function NotificationsScreen() {
           paddingHorizontal: 16,
           paddingVertical: 12,
           borderBottomWidth: 1,
-          borderBottomColor: '#F3F4F6',
+          borderBottomColor: '#F2EDE8',
           backgroundColor: '#FFFFFF',
         }}
       >
         <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Notifications</Text>
         <TouchableOpacity onPress={() => void markAllRead()} style={{ minHeight: 48, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: '#E8590C' }}>Mark all read</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#D85A30' }}>Mark all read</Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
         data={rows}
         keyExtractor={(item) => item.id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor="#E8590C" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor="#D85A30" />}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 }}
         ListEmptyComponent={
           <View style={{ paddingTop: 64, alignItems: 'center' }}>
@@ -197,10 +197,10 @@ export default function NotificationsScreen() {
                   marginBottom: 10,
                   borderRadius: 16,
                   borderWidth: 1,
-                  borderColor: item.is_read ? '#F3F4F6' : '#FED7AA',
+                  borderColor: item.is_read ? '#F2EDE8' : '#FED7AA',
                   borderLeftWidth: item.is_read ? 1 : 4,
-                  borderLeftColor: item.is_read ? '#F3F4F6' : '#E8590C',
-                  backgroundColor: item.is_read ? '#FFFFFF' : '#FFF4EE',
+                  borderLeftColor: item.is_read ? '#F2EDE8' : '#D85A30',
+                  backgroundColor: item.is_read ? '#FFFFFF' : '#FBF0EB',
                   padding: 12,
                 }}
               >
@@ -210,7 +210,7 @@ export default function NotificationsScreen() {
                       width: 44,
                       height: 44,
                       borderRadius: 22,
-                      backgroundColor: '#F3F4F6',
+                      backgroundColor: '#F2EDE8',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}

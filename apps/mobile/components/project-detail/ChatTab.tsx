@@ -22,7 +22,7 @@ import { ProjectHeroAndStage } from '@/components/project-detail/ProjectChrome'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { ChatMessage, DetailTab } from '@/components/project-detail/types'
 
-const BRAND = '#E8590C'
+const BRAND = '#D85A30'
 
 type ChatTabProps = {
   projectId: string
@@ -42,6 +42,7 @@ type ChatTabProps = {
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
     onPressProjectImages?: () => void
+    onPressProjectOverview?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -231,6 +232,7 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
       professionalRole={listHeaderProps.professionalRole}
       onPressProfessional={listHeaderProps.onPressProfessional}
       onPressProjectImages={listHeaderProps.onPressProjectImages}
+        onPressProjectOverview={listHeaderProps.onPressProjectOverview}
       contractorAssigned={listHeaderProps.contractorAssigned}
       hideStageTracker={listHeaderProps.hideStageTracker}
       showReportsTab={listHeaderProps.showReportsTab}
@@ -311,7 +313,7 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
                         paddingVertical: 10,
                         backgroundColor: own ? BRAND : '#FFFFFF',
                         borderWidth: own ? 0 : 1,
-                        borderColor: '#F3F4F6',
+                        borderColor: '#F2EDE8',
                       }}
                     >
                       <Text style={{ fontSize: 14, color: own ? '#FFFFFF' : '#111827' }}>{message.content}</Text>
@@ -327,7 +329,7 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
       <View
         style={{
           borderTopWidth: 1,
-          borderTopColor: '#F3F4F6',
+          borderTopColor: '#F2EDE8',
           backgroundColor: '#FFFFFF',
           paddingHorizontal: 10,
           paddingTop: 10,
@@ -337,7 +339,7 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
           gap: 8,
         }}
       >
-        <TouchableOpacity onPress={() => void uploadAndSendPhoto()} disabled={uploadingImage} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}>
+        <TouchableOpacity onPress={() => void uploadAndSendPhoto()} disabled={uploadingImage} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#F2EDE8', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 18 }}>📎</Text>
         </TouchableOpacity>
         <TextInput
@@ -346,7 +348,7 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
           placeholder="Message…"
           maxLength={1000}
           multiline
-          style={{ flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 20, backgroundColor: '#F3F4F6', paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 }}
+          style={{ flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 20, backgroundColor: '#F2EDE8', paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 }}
         />
         <TouchableOpacity
           onPress={() => void sendTextMessage()}

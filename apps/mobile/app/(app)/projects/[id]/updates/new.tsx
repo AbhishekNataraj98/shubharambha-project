@@ -162,7 +162,7 @@ export default function PostUpdateScreen() {
     }
   }
 
-  const charStyle = useMemo(() => (description.length > 400 ? '#E8590C' : '#9CA3AF'), [description.length])
+  const charStyle = useMemo(() => (description.length > 400 ? '#D85A30' : '#9CA3AF'), [description.length])
 
   if (!projectId) return null
 
@@ -174,7 +174,7 @@ export default function PostUpdateScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         </View>
       </SafeAreaView>
     )
@@ -190,7 +190,7 @@ export default function PostUpdateScreen() {
     )
   }
 
-  const BRAND = '#E8590C'
+  const BRAND = '#D85A30'
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
@@ -203,7 +203,7 @@ export default function PostUpdateScreen() {
             paddingHorizontal: 12,
             paddingVertical: 10,
             borderBottomWidth: 1,
-            borderBottomColor: '#F3F4F6',
+            borderBottomColor: '#F2EDE8',
           }}
         >
           <Pressable onPress={() => router.back()} style={{ padding: 8 }} accessibilityLabel="Back">

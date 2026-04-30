@@ -36,7 +36,7 @@ export default function ReinviteContractorButton({
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex rounded-lg bg-[#E8590C] px-4 py-2 text-sm font-semibold text-white"
+      className="inline-flex rounded-lg bg-[#D85A30] px-4 py-2 text-sm font-semibold text-white"
     >
       Find New Contractor
     </button>

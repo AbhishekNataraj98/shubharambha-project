@@ -2,29 +2,11 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { Check, ChevronLeft, MapPin, MoreVertical } from 'lucide-react'
+import { ChevronLeft, MapPin, MoreVertical } from 'lucide-react'
 import type { Database } from '@/types/supabase'
 import ReinviteContractorButton from '@/components/shared/reinvite-contractor-button'
 import ProjectDetailTabs from '@/components/shared/project-detail-tabs'
 import NotificationBell from '@/components/shared/NotificationBell'
-
-const stageOrder = [
-  'foundation',
-  'plinth',
-  'walls',
-  'slab',
-  'plastering',
-  'finishing',
-] as const
-
-const stageLabels: Record<(typeof stageOrder)[number], string> = {
-  foundation: 'Foundation',
-  plinth: 'Plinth',
-  walls: 'Walls',
-  slab: 'Slab',
-  plastering: 'Plastering',
-  finishing: 'Finishing',
-}
 
 const statusBadgeClass: Record<string, string> = {
   on_hold: 'bg-yellow-100 text-yellow-800',
@@ -134,7 +116,6 @@ export default async function ProjectDetailPage({
       ).data?.name ?? preferredProfessionalName
     : preferredProfessionalName
 
-  const currentStageIndex = stageOrder.indexOf(project.current_stage as (typeof stageOrder)[number])
   const workerInviteProject = (membersForProject ?? []).some(
     (member) => member.user_id !== project.customer_id && member.role === 'worker'
   )
@@ -148,7 +129,7 @@ export default async function ProjectDetailPage({
       : project.status
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] pb-24">
+    <div className="min-h-screen bg-[#F2EDE8] pb-24">
       <header className="sticky top-0 z-30 bg-white shadow-sm">
         <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
           <Link href="/projects" className="rounded-full p-2 hover:bg-gray-100" aria-label="Back to projects">
@@ -196,53 +177,17 @@ export default async function ProjectDetailPage({
           ) : null}
           <Link
             href={`/projects/${project.id}/images`}
-            className="mt-2.5 inline-flex rounded-md bg-[#E8590C] px-3 py-2 text-xs font-bold text-white hover:bg-orange-600"
+            className="mt-2.5 inline-flex rounded-md bg-[#D85A30] px-3 py-2 text-xs font-bold text-white hover:bg-orange-600"
           >
             View Project Images
           </Link>
+          <Link
+            href={`/projects/${project.id}/overview`}
+            className="mt-2.5 ml-2 inline-flex rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100"
+          >
+            Project Overview
+          </Link>
         </section>
-
-        {!workerDetails && !workerInviteProject ? (
-          <section className="mx-4 mt-2.5 rounded-xl border border-gray-100 bg-white p-3">
-          <div className="flex items-start justify-between gap-1">
-            {stageOrder.map((stage, index) => {
-              const completed = index < currentStageIndex
-              const current = index === currentStageIndex
-              return (
-                <div key={stage} className="flex min-w-0 flex-1 items-start">
-                  <div className="flex min-w-0 flex-1 flex-col items-center">
-                    <div
-                      className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                        completed
-                          ? 'bg-orange-500 text-white'
-                          : current
-                            ? 'ring-offset-background bg-orange-500 text-white ring-2 ring-orange-200 ring-offset-2'
-                            : 'border-2 border-gray-200 bg-white text-gray-400'
-                      }`}
-                    >
-                      {completed ? (
-                        <Check className="h-3 w-3" />
-                      ) : current ? (
-                        <div className="h-1.5 w-1.5 rounded-full bg-white" />
-                      ) : null}
-                    </div>
-                    <p
-                      className={`mt-1 truncate text-[9px] ${
-                        completed || current ? 'font-medium text-orange-600' : 'text-gray-400'
-                      }`}
-                    >
-                      {stageLabels[stage]}
-                    </p>
-                  </div>
-                  {index < stageOrder.length - 1 ? (
-                    <div className={`mt-2.5 h-0.5 flex-1 ${index < currentStageIndex ? 'bg-orange-500' : 'bg-gray-200'}`} />
-                  ) : null}
-                </div>
-              )
-            })}
-          </div>
-          </section>
-        ) : null}
 
         {isCustomer && project.status === 'cancelled' ? (
           <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">

@@ -14,6 +14,7 @@ import { useState, useRef } from 'react'
 import { router } from 'expo-router'
 import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/components/shared/Logo'
 import type { TextInput as TextInputType } from 'react-native'
 
 const { width } = Dimensions.get('window')
@@ -112,7 +113,7 @@ export default function LoginScreen() {
           {/* Logo section */}
           <View style={styles.logoSection}>
             <View style={styles.logoBox}>
-              <Text style={styles.logoLetter}>S</Text>
+              <Logo size={44} color="white" />
             </View>
             <Text style={styles.appName}>Shubharambha</Text>
             <Text style={styles.tagline}>Construction made transparent</Text>
@@ -262,31 +263,26 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 20,
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: '#E8590C',
+    shadowColor: '#D85A30',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 20,
     elevation: 10,
   },
-  logoLetter: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '800',
-  },
   appName: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1C1917',
+    color: '#2C2C2A',
     letterSpacing: -0.5,
     marginBottom: 6,
   },
   tagline: {
     fontSize: 14,
-    color: '#E8590C',
+    color: '#D85A30',
     fontWeight: '500',
     letterSpacing: 0.2,
   },
@@ -298,7 +294,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 28,
-    shadowColor: '#1C1917',
+    shadowColor: '#2C2C2A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 20,
@@ -307,7 +303,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1C1917',
+    color: '#2C2C2A',
     marginBottom: 6,
   },
   subheading: {
@@ -330,7 +326,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   prefixBox: {
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
     borderRadius: 14,
     paddingHorizontal: 16,
     height: 54,
@@ -346,11 +342,11 @@ const styles = StyleSheet.create({
   phoneInput: {
     flex: 1,
     height: 54,
-    backgroundColor: '#F5F5F4',
+    backgroundColor: '#EDE8E3',
     borderRadius: 14,
     paddingHorizontal: 16,
     fontSize: 18,
-    color: '#1C1917',
+    color: '#2C2C2A',
     fontWeight: '500',
     borderWidth: 1.5,
     borderColor: '#E7E5E4',
@@ -361,11 +357,11 @@ const styles = StyleSheet.create({
   otpInput: {
     width: '100%',
     height: 72,
-    backgroundColor: '#F5F5F4',
+    backgroundColor: '#EDE8E3',
     borderRadius: 16,
     fontSize: 36,
     fontWeight: '700',
-    color: '#1C1917',
+    color: '#2C2C2A',
     textAlign: 'center',
     letterSpacing: 12,
     borderWidth: 1.5,
@@ -377,11 +373,11 @@ const styles = StyleSheet.create({
   primaryButton: {
     height: 54,
     borderRadius: 16,
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
-    shadowColor: '#E8590C',
+    shadowColor: '#D85A30',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
@@ -416,7 +412,7 @@ const styles = StyleSheet.create({
   },
   resendLink: {
     fontSize: 14,
-    color: '#E8590C',
+    color: '#D85A30',
     fontWeight: '600',
   },
 
@@ -429,7 +425,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   termsLink: {
-    color: '#E8590C',
+    color: '#D85A30',
     fontWeight: '500',
   },
 })

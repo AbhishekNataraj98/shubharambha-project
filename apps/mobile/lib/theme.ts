@@ -1,18 +1,23 @@
 /** Visual tokens aligned with `apps/web` dashboard / bottom-nav. */
 export const colors = {
-  background: '#FAFAFA',
-  foreground: '#1A1A1A',
-  muted: '#7A6F66',
-  mutedLight: '#999999',
+  background: '#F2EDE8',
+  foreground: '#2C2C2A',
+  muted: '#78716C',
+  mutedLight: '#A8A29E',
   border: '#E0D5CC',
-  brand: '#E8590C',
-  brandDark: '#C44A0A',
+  brand: '#D85A30',
+  brandDark: '#B8471F',
   white: '#FFFFFF',
-  rolePillBg: '#FFF8F5',
-  emptyBg: '#FFFBF7',
-  inviteBg: '#FEF3E2',
-  green: '#4CAF50',
-  red: '#F44336',
+  rolePillBg: '#FBF0EB',
+  emptyBg: '#FAF5F0',
+  inviteBg: '#FBF0EB',
+  green: '#166534',
+  red: '#991B1B',
+  cardBg: '#FFFFFF',
+  cardBorder: '#E8DDD4',
+  headerBg: '#2C2C2A',
+  inputBg: '#FFFFFF',
+  pageBg: '#F2EDE8',
 } as const
 
 export const stageProgress: Record<string, number> = {
@@ -54,17 +59,17 @@ export function daysAgoText(dateValue?: string) {
 }
 
 export function statusPillStyles(status: string) {
-  if (status === 'active') return { backgroundColor: '#E8F5E9', color: '#2E7D32' }
-  if (status === 'pending' || status === 'on_hold') return { backgroundColor: '#FEF3E2', color: '#B8860B' }
-  if (status === 'completed') return { backgroundColor: '#F5F5F5', color: '#616161' }
-  if (status === 'cancelled') return { backgroundColor: '#FFEBEE', color: '#C62828' }
-  return { backgroundColor: '#F5F5F5', color: '#616161' }
+  if (status === 'active') return { backgroundColor: '#DCFCE7', color: '#166534' }
+  if (status === 'pending' || status === 'on_hold') return { backgroundColor: '#FEF3C7', color: '#92400E' }
+  if (status === 'completed') return { backgroundColor: '#F2EDE8', color: '#78716C' }
+  if (status === 'cancelled') return { backgroundColor: '#FEE2E2', color: '#991B1B' }
+  return { backgroundColor: '#F2EDE8', color: '#78716C' }
 }
 
 export function statusBarColor(status: string) {
   if (status === 'on_hold') return '#F59E0B'
-  if (status === 'active') return '#10B981'
-  if (status === 'completed') return '#6B7280'
-  if (status === 'cancelled') return '#EF4444'
-  return colors.border
+  if (status === 'active') return '#166534'
+  if (status === 'completed') return '#78716C'
+  if (status === 'cancelled') return '#991B1B'
+  return '#E0D5CC'
 }

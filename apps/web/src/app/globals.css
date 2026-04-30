@@ -49,6 +49,18 @@
 }
 
 :root {
+  --brand: #D85A30;
+  --brand-dark: #B8471F;
+  --brand-light: #FBF0EB;
+  --brand-border: #F5DDD4;
+  --charcoal: #2C2C2A;
+  --page-bg: #F2EDE8;
+  --card-bg: #FFFFFF;
+  --card-border: #E8DDD4;
+  --input-border: #E0D5CC;
+  --text-primary: #2C2C2A;
+  --text-secondary: #78716C;
+  --text-muted: #A8A29E;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -127,4 +139,11 @@
   html {
     @apply font-sans;
   }
+}
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

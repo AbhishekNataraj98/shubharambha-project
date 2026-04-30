@@ -56,7 +56,7 @@ export default function NewProjectScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
-        <ActivityIndicator size="large" color="#E8590C" />
+        <ActivityIndicator size="large" color="#D85A30" />
       </View>
     )
   }
@@ -114,7 +114,7 @@ export default function NewProjectScreen() {
     }
   }
 
-  const BRAND = '#E8590C'
+  const BRAND = '#D85A30'
   const FG = '#1A1A1A'
   const BORDER = '#E0D5CC'
 
@@ -135,11 +135,11 @@ export default function NewProjectScreen() {
         </View>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-          <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FFF4EE' }}>
+          <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#FBF0EB' }}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND }}>1. Details</Text>
           </View>
           <Text style={{ color: '#9CA3AF', alignSelf: 'center' }}>→</Text>
-          <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: isInviteMode ? '#FFF4EE' : '#F3F4F6' }}>
+          <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: isInviteMode ? '#FBF0EB' : '#F2EDE8' }}>
             <Text style={{ fontSize: 13, color: isInviteMode ? BRAND : '#6B7280', fontWeight: isInviteMode ? '700' : '400' }}>
               {isInviteMode ? '2. Send Invite' : '2. Find Contractor'}
             </Text>
@@ -173,7 +173,7 @@ export default function NewProjectScreen() {
                   minHeight: 48,
                   paddingHorizontal: 14,
                   borderRadius: 999,
-                  backgroundColor: selected ? '#FFF4EE' : '#F3F4F6',
+                  backgroundColor: selected ? '#FBF0EB' : '#F2EDE8',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -261,7 +261,7 @@ export default function NewProjectScreen() {
               </TouchableOpacity>
               <Text style={{ fontWeight: '700', color: '#1A1A1A' }}>Select start date</Text>
               <TouchableOpacity onPress={() => setShowStartDatePicker(false)} hitSlop={8}>
-                <Text style={{ color: '#E8590C', fontWeight: '700' }}>Done</Text>
+                <Text style={{ color: '#D85A30', fontWeight: '700' }}>Done</Text>
               </TouchableOpacity>
             </View>
             <DateTimePicker

@@ -5,6 +5,7 @@ import { useSessionState } from '@/lib/auth-state'
 import { apiPost, apiPostMarkAllNotificationsRead } from '@/lib/api'
 import { getMobileNotificationTarget } from '@/lib/notificationTarget'
 import { supabase } from '@/lib/supabase'
+import Logo from '@/components/shared/Logo'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 function emojiForType(type: string): string {
@@ -136,7 +137,7 @@ export default function AppLayout() {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         </View>
       </SafeAreaView>
     )
@@ -144,20 +145,35 @@ export default function AppLayout() {
 
   if (!user) return <Redirect href={'/(auth)/login' as any} />
   if (!profile) return <Redirect href={'/(auth)/register' as any} />
-  const initials = (profile.name ?? 'U')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || 'U'
-
   return (
     <>
       <Stack
         screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: '#E8590C' },
+        headerStyle: { backgroundColor: '#2C2C2A' },
         headerShadowVisible: false,
+        headerTitleAlign: 'left',
+        headerLeftContainerStyle: {
+          paddingLeft: 6,
+        },
+        headerLeft: () => (
+          <Pressable
+            onPress={() => router.push('/(app)/(tabs)/profile')}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255,255,255,0.14)',
+            }}
+            hitSlop={8}
+            accessibilityLabel="Profile"
+            android_ripple={{ color: 'rgba(255,255,255,0.12)', borderless: true }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 20, backgroundColor: 'transparent' }}>👤</Text>
+          </Pressable>
+        ),
         headerTitle: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View
@@ -170,35 +186,32 @@ export default function AppLayout() {
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>S</Text>
+              <Logo size={16} color="white" />
             </View>
             <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '800' }}>Shubharambha</Text>
           </View>
         ),
         headerTintColor: '#FFFFFF',
         headerRightContainerStyle: {
-          paddingRight: 8,
+          paddingRight: 6,
         },
         headerRight: () => (
           <>
             <Pressable
               onPress={() => setNotificationMenuOpen((prev) => !prev)}
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginRight: 12,
-                backgroundColor: 'rgba(255,255,255,0.20)',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.40)',
+                backgroundColor: 'rgba(255,255,255,0.14)',
               }}
               hitSlop={8}
               accessibilityLabel="Notifications"
-              android_ripple={{ color: 'rgba(255,255,255,0.15)', borderless: true }}
+              android_ripple={{ color: 'rgba(255,255,255,0.12)', borderless: false }}
             >
-              <Text style={{ color: '#FFFFFF', fontSize: 17, backgroundColor: 'transparent' }}>🔔</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 19, backgroundColor: 'transparent' }}>🔔</Text>
               {unreadCount > 0 ? (
                 <View
                   style={{
@@ -219,26 +232,6 @@ export default function AppLayout() {
                   </Text>
                 </View>
               ) : null}
-            </Pressable>
-            <Pressable
-              onPress={() => router.push('/(app)/(tabs)/profile')}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(255,255,255,0.14)',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.30)',
-              }}
-              hitSlop={8}
-              accessibilityLabel="Profile"
-              android_ripple={{ color: 'rgba(255,255,255,0.12)', borderless: true }}
-            >
-              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800', backgroundColor: 'transparent' }}>
-                {initials}
-              </Text>
             </Pressable>
           </>
         ),
@@ -272,7 +265,7 @@ export default function AppLayout() {
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 borderBottomWidth: 1,
-                borderBottomColor: '#F3F4F6',
+                borderBottomColor: '#F2EDE8',
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -280,7 +273,7 @@ export default function AppLayout() {
             >
               <Text style={{ fontWeight: '700', color: '#111827' }}>Notifications</Text>
               <TouchableOpacity onPress={() => void markAllRead()} style={{ minHeight: 32, justifyContent: 'center' }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#E8590C' }}>Mark all read</Text>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#D85A30' }}>Mark all read</Text>
               </TouchableOpacity>
             </View>
             <ScrollView
@@ -300,10 +293,10 @@ export default function AppLayout() {
                       marginBottom: 10,
                       borderRadius: 16,
                       borderWidth: 1,
-                      borderColor: item.is_read ? '#F3F4F6' : '#FED7AA',
+                      borderColor: item.is_read ? '#F2EDE8' : '#FED7AA',
                       borderLeftWidth: item.is_read ? 1 : 4,
-                      borderLeftColor: item.is_read ? '#F3F4F6' : '#E8590C',
-                      backgroundColor: item.is_read ? '#FFFFFF' : '#FFF4EE',
+                      borderLeftColor: item.is_read ? '#F2EDE8' : '#D85A30',
+                      backgroundColor: item.is_read ? '#FFFFFF' : '#FBF0EB',
                       padding: 12,
                     }}
                     activeOpacity={0.85}
@@ -314,7 +307,7 @@ export default function AppLayout() {
                           width: 44,
                           height: 44,
                           borderRadius: 22,
-                          backgroundColor: '#F3F4F6',
+                          backgroundColor: '#F2EDE8',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -333,7 +326,7 @@ export default function AppLayout() {
                 ))
               )}
             </ScrollView>
-            <View style={{ borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 10 }}>
+            <View style={{ borderTopWidth: 1, borderTopColor: '#F2EDE8', paddingHorizontal: 12, paddingVertical: 10 }}>
               <TouchableOpacity
                 onPress={() => {
                   setNotificationMenuOpen(false)
@@ -341,7 +334,7 @@ export default function AppLayout() {
                 }}
                 style={{ minHeight: 40, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Text style={{ color: '#E8590C', fontWeight: '700' }}>See more</Text>
+                <Text style={{ color: '#D85A30', fontWeight: '700' }}>See more</Text>
               </TouchableOpacity>
             </View>
           </View>

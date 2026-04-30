@@ -1,7 +1,7 @@
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import { STAGE_LABELS, STAGE_ORDER, type DetailTab, type StageKey } from '@/components/project-detail/types'
+import { Text, TouchableOpacity, View } from 'react-native'
+import { type DetailTab } from '@/components/project-detail/types'
 
-const BRAND = '#E8590C'
+const BRAND = '#D85A30'
 const BORDER = '#E0D5CC'
 const FG = '#1A1A1A'
 const MUTED = '#7A6F66'
@@ -10,7 +10,7 @@ const STATUS_BADGE: Record<string, { bg: string; fg: string; label: string }> = 
   pending: { bg: '#FEF3C7', fg: '#92400E', label: 'Awaiting Contractor' },
   on_hold: { bg: '#FEF3C7', fg: '#92400E', label: 'Awaiting Contractor' },
   active: { bg: '#D1FAE5', fg: '#065F46', label: 'In Progress' },
-  completed: { bg: '#F3F4F6', fg: '#374151', label: 'Completed' },
+  completed: { bg: '#F2EDE8', fg: '#374151', label: 'Completed' },
   cancelled: { bg: '#FEE2E2', fg: '#991B1B', label: 'Cancelled' },
 }
 
@@ -26,6 +26,7 @@ type ProjectChromeProps = {
   professionalRole?: 'worker' | 'contractor' | null
   onPressProfessional?: () => void
   onPressProjectImages?: () => void
+  onPressProjectOverview?: () => void
   contractorAssigned?: boolean
   activeTab: DetailTab
   onTabChange: (tab: DetailTab) => void
@@ -35,7 +36,7 @@ type ProjectChromeProps = {
 }
 
 export function ProjectHeroAndStage(props: ProjectChromeProps) {
-  const { projectName, address, city, status, currentStage } = props
+  const { projectName, address, city, status } = props
   const badge = STATUS_BADGE[status] ?? STATUS_BADGE.completed
   const badgeLabel =
     status === 'pending' || status === 'on_hold'
@@ -43,8 +44,6 @@ export function ProjectHeroAndStage(props: ProjectChromeProps) {
         ? 'Waiting contractor approval'
         : 'Waiting worker approval'
       : badge.label
-  const currentStageIndex = STAGE_ORDER.indexOf(currentStage as StageKey)
-
   return (
     <>
       <View
@@ -93,92 +92,38 @@ export function ProjectHeroAndStage(props: ProjectChromeProps) {
           )
         ) : null}
         {props.onPressProjectImages ? (
-          <TouchableOpacity
-            onPress={props.onPressProjectImages}
-            style={{
-              marginTop: 10,
-              alignSelf: 'flex-start',
-              borderRadius: 10,
-              backgroundColor: BRAND,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>View Project Images</Text>
-          </TouchableOpacity>
+          <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              onPress={props.onPressProjectImages}
+              style={{
+                borderRadius: 10,
+                backgroundColor: BRAND,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>View Project Images</Text>
+            </TouchableOpacity>
+            {props.onPressProjectOverview ? (
+              <TouchableOpacity
+                onPress={props.onPressProjectOverview}
+                style={{
+                  borderRadius: 10,
+                  backgroundColor: '#FBF0EB',
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '800', color: BRAND }}>Project Overview</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
       </View>
-
-      {!props.hideStageTracker ? (
-        <View
-          style={{
-            marginHorizontal: 16,
-            marginTop: 6,
-            borderRadius: 14,
-            backgroundColor: '#FFFFFF',
-            paddingVertical: 8,
-            paddingHorizontal: 6,
-            borderWidth: 1,
-            borderColor: BORDER,
-          }}
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 2 }}>
-            {STAGE_ORDER.map((stage, index) => {
-              const completed = index < currentStageIndex
-              const current = index === currentStageIndex
-              const lineToNextOrange = index < currentStageIndex
-              return (
-                <View key={stage} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                  <View style={{ alignItems: 'center', width: 50 }}>
-                    <View
-                      style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 12,
-                        backgroundColor: completed || current ? BRAND : '#FFFFFF',
-                        borderWidth: completed || current ? 0 : 2,
-                        borderColor: BORDER,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {completed ? (
-                        <Text style={{ color: '#FFFFFF', fontSize: 10 }}>✓</Text>
-                      ) : current ? (
-                        <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#FFFFFF' }} />
-                      ) : null}
-                    </View>
-                    <Text
-                      numberOfLines={2}
-                      style={{
-                        marginTop: 3,
-                        fontSize: 9,
-                        textAlign: 'center',
-                        color: completed || current ? BRAND : '#9CA3AF',
-                        fontWeight: completed || current ? '600' : '400',
-                        width: 50,
-                      }}
-                    >
-                      {STAGE_LABELS[stage]}
-                    </Text>
-                  </View>
-                  {index < STAGE_ORDER.length - 1 ? (
-                    <View
-                      style={{
-                        width: 10,
-                        height: 2,
-                        marginTop: 11,
-                        backgroundColor: lineToNextOrange ? BRAND : '#E5E7EB',
-                      }}
-                    />
-                  ) : null}
-                </View>
-              )
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
 
       {!props.tabRowOnly ? (
         <DetailTabRow
@@ -208,7 +153,7 @@ export function DetailTabRow({
         marginHorizontal: 16,
         marginTop: 6,
         borderTopWidth: 1,
-        borderTopColor: '#F3F4F6',
+        borderTopColor: '#F2EDE8',
         paddingTop: 4,
         borderBottomWidth: 1,
         borderBottomColor: BORDER,

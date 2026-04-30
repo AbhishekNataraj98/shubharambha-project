@@ -67,13 +67,13 @@ function TabsTrigger({ className, value, children, ...props }: TabsTriggerProps)
       data-state={active ? 'active' : 'inactive'}
       className={cn(
         'relative flex-1 pb-2 text-sm font-medium transition-colors',
-        active ? 'text-[#E8590C]' : 'text-gray-500',
+        active ? 'text-[#D85A30]' : 'text-gray-500',
         className
       )}
       {...props}
     >
       {children}
-      {active ? <span className="absolute right-3 bottom-0 left-3 h-0.5 rounded-full bg-[#E8590C]" /> : null}
+      {active ? <span className="absolute right-3 bottom-0 left-3 h-0.5 rounded-full bg-[#D85A30]" /> : null}
     </button>
   )
 }

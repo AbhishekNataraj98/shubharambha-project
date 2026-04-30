@@ -129,11 +129,11 @@ export default function NewProjectPage() {
         ) : null}
 
         <div className="mb-6 flex items-center gap-2 text-sm">
-          <div className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-[#E8590C]">
+          <div className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-[#D85A30]">
             1. Project Details
           </div>
           <span className="text-gray-400">→</span>
-          <div className={`rounded-full px-3 py-1 ${isInviteMode ? 'bg-orange-100 text-[#E8590C] font-semibold' : 'bg-gray-100 text-gray-500'}`}>
+          <div className={`rounded-full px-3 py-1 ${isInviteMode ? 'bg-orange-100 text-[#D85A30] font-semibold' : 'bg-gray-100 text-gray-500'}`}>
             {isInviteMode ? '2. Send Invite' : '2. Find Contractor'}
           </div>
         </div>
@@ -189,7 +189,7 @@ export default function NewProjectPage() {
                     type="button"
                     onClick={() => form.setValue('project_type', type, { shouldDirty: true })}
                     className={`rounded-full px-3 py-1.5 text-sm ${
-                      selected ? 'bg-orange-100 text-[#E8590C]' : 'bg-gray-100 text-gray-700'
+                      selected ? 'bg-orange-100 text-[#D85A30]' : 'bg-gray-100 text-gray-700'
                     }`}
                   >
                     {type}
@@ -224,7 +224,7 @@ export default function NewProjectPage() {
           <Button
             type="submit"
             disabled={!canContinue || sendingInvite}
-            className="mt-4 h-12 w-full rounded-lg bg-[#E8590C] text-base font-semibold text-white hover:bg-[#cf4e09]"
+            className="mt-4 h-12 w-full rounded-lg bg-[#D85A30] text-base font-semibold text-white hover:bg-[#cf4e09]"
           >
             {isInviteMode ? (sendingInvite ? 'Sending Invite...' : 'Send Invite') : 'Find Contractor'}
           </Button>

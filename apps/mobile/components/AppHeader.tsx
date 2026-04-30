@@ -23,6 +23,15 @@ export function AppHeader({ initials }: AppHeaderProps) {
     >
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
+          <Pressable
+            onPress={() => router.push('/profile' as never)}
+            className="h-10 w-10 items-center justify-center rounded-full"
+            style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+          >
+            <Text className="text-sm font-bold text-white">{initials}</Text>
+          </Pressable>
           <View
             className="h-10 w-10 items-center justify-center rounded-lg"
             style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
@@ -31,15 +40,7 @@ export function AppHeader({ initials }: AppHeaderProps) {
           </View>
           <Text className="text-lg font-bold text-white">Shubharambha</Text>
         </View>
-        <Pressable
-          onPress={() => router.push('/profile' as never)}
-          className="h-10 w-10 items-center justify-center rounded-full"
-          style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
-          accessibilityRole="button"
-          accessibilityLabel="Open profile"
-        >
-          <Text className="text-sm font-bold text-white">{initials}</Text>
-        </Pressable>
+        <View style={{ width: 40 }} />
       </View>
     </View>
   )

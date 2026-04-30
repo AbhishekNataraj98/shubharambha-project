@@ -11,7 +11,7 @@ export default function AuthLayout() {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         </View>
       </SafeAreaView>
     )

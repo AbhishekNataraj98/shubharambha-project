@@ -48,7 +48,7 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string; b
   pending: { bg: '#FEF3C7', text: '#92400E', label: 'Awaiting Contractor', border: '#F59E0B' },
   on_hold: { bg: '#FEF3C7', text: '#92400E', label: 'Awaiting Contractor', border: '#F59E0B' },
   active: { bg: '#D1FAE5', text: '#065F46', label: 'In Progress', border: '#10B981' },
-  completed: { bg: '#F3F4F6', text: '#374151', label: 'Completed', border: '#9CA3AF' },
+  completed: { bg: '#F2EDE8', text: '#374151', label: 'Completed', border: '#9CA3AF' },
   cancelled: { bg: '#FEE2E2', text: '#991B1B', label: 'Cancelled', border: '#EF4444' },
 }
 
@@ -225,7 +225,7 @@ export default function ProjectsScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#E8590C" />
+          <ActivityIndicator size="large" color="#D85A30" />
         </View>
       </SafeAreaView>
     )
@@ -237,7 +237,7 @@ export default function ProjectsScreen() {
         data={filteredProjects}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E8590C" colors={['#E8590C']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#D85A30" colors={['#D85A30']} />}
         ListHeaderComponent={
           <View>
             <Text style={styles.sectionTitle}>My Projects</Text>
@@ -322,10 +322,10 @@ export default function ProjectsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F5F4EF' },
+  safe: { flex: 1, backgroundColor: '#F2EDE8' },
   loaderWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 110 },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#1C1917', marginBottom: 12 },
+  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#2C2C2A', marginBottom: 12 },
   filterRow: { flexDirection: 'row', paddingBottom: 8 },
   filterBtn: {
     minHeight: 40,
@@ -336,9 +336,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   filterBtnActive: {
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
     borderWidth: 1,
-    borderColor: '#E8590C',
+    borderColor: '#D85A30',
   },
   filterBtnInactive: {
     backgroundColor: '#FFFFFF',
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   projectName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1C1917',
+    color: '#2C2C2A',
     flex: 1,
     marginRight: 8,
   },
@@ -378,12 +378,12 @@ const styles = StyleSheet.create({
   projectCity: { fontSize: 13, color: '#78716C', marginBottom: 12 },
   progressTrack: {
     height: 5,
-    backgroundColor: '#F5F5F4',
+    backgroundColor: '#EDE8E3',
     borderRadius: 3,
     marginBottom: 10,
     overflow: 'hidden',
   },
-  progressFill: { height: 5, backgroundColor: '#E8590C', borderRadius: 3 },
+  progressFill: { height: 5, backgroundColor: '#D85A30', borderRadius: 3 },
   projectCardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeText: { fontSize: 11, fontWeight: '600' },
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyEmoji: { fontSize: 42, marginBottom: 10 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#1C1917', marginBottom: 8 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#2C2C2A', marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: '#78716C', textAlign: 'center', paddingHorizontal: 28, lineHeight: 20 },
   fab: {
     position: 'absolute',
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',

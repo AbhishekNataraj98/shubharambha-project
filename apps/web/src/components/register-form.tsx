@@ -150,7 +150,7 @@ export default function RegisterForm() {
   return (
     <div className="min-h-screen px-4 py-6" style={{ backgroundColor: '#FFF8F5' }}>
       <div className="mx-auto w-full max-w-md">
-        <div className="mx-[-16px] mb-5 border-b px-4 py-3" style={{ backgroundColor: '#E8590C', borderColor: 'rgba(196,74,10,0.45)' }}>
+        <div className="mx-[-16px] mb-5 border-b px-4 py-3" style={{ backgroundColor: '#D85A30', borderColor: 'rgba(196,74,10,0.45)' }}>
           <div className="flex items-center justify-between">
             <button
               type="button"
@@ -165,9 +165,9 @@ export default function RegisterForm() {
               ‹
             </button>
             <div className="inline-flex items-center gap-2">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 text-sm font-extrabold text-white">
-                S
-              </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
+                <img src="/icons/logo-white.svg" alt="Shubharambha" className="h-5 w-5" />
+              </div>
               <span className="text-base font-extrabold text-white">Shubharambha</span>
             </div>
             <span className="h-9 w-9" />
@@ -184,12 +184,12 @@ export default function RegisterForm() {
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-full font-semibold text-white transition-colors"
                     style={{
-                      backgroundColor: isActive ? '#E8590C' : '#E0D5CC',
+                      backgroundColor: isActive ? '#D85A30' : '#E0D5CC',
                     }}
                   >
                     {step}
                   </div>
-                  <p className="mt-2 text-xs font-medium" style={{ color: isActive ? '#E8590C' : '#999' }}>
+                  <p className="mt-2 text-xs font-medium" style={{ color: isActive ? '#D85A30' : '#999' }}>
                     {step === 1 ? 'Role' : step === 2 ? 'Details' : 'Complete'}
                   </p>
                 </div>
@@ -200,10 +200,10 @@ export default function RegisterForm() {
 
         {/* Header */}
         <div className="mb-5 text-center">
-          <h1 className="text-[28px] font-extrabold" style={{ color: '#1A1A1A' }}>
+          <h1 className="text-[28px] font-extrabold" style={{ color: 'var(--text-primary)' }}>
             Create your profile
           </h1>
-          <p className="mt-2 text-sm font-medium" style={{ color: '#7A6F66' }}>
+          <p className="mt-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
             Tell us about yourself to get started
           </p>
         </div>
@@ -211,7 +211,7 @@ export default function RegisterForm() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Role Selection Section */}
           <section className="space-y-4">
-            <label className="block text-sm font-bold" style={{ color: '#1A1A1A' }}>
+            <label className="block text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
               What is your role?
             </label>
             <div className="space-y-3">
@@ -230,7 +230,7 @@ export default function RegisterForm() {
                     }}
                     className="flex w-full gap-4 rounded-lg border-2 p-4 text-left transition-all"
                     style={{
-                      borderColor: isSelected ? '#E8590C' : '#E0D5CC',
+                      borderColor: isSelected ? '#D85A30' : '#E0D5CC',
                       backgroundColor: isSelected ? '#FFF8F5' : '#FFFFFF',
                     }}
                   >
@@ -238,25 +238,25 @@ export default function RegisterForm() {
                     {isSelected && (
                       <div
                         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
-                        style={{ backgroundColor: '#E8590C' }}
+                        style={{ backgroundColor: '#D85A30' }}
                       />
                     )}
                     <div
                       className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg"
-                      style={{ backgroundColor: isSelected ? '#E8590C' : '#E0D5CC', color: 'white' }}
+                      style={{ backgroundColor: isSelected ? '#D85A30' : '#E0D5CC', color: 'white' }}
                     >
                       {role.icon}
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-bold" style={{ color: '#1A1A1A' }}>
+                      <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>
                         {role.title}
                       </h3>
-                      <p className="mt-0.5 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                      <p className="mt-0.5 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                         {role.description}
                       </p>
                     </div>
                     {isSelected && (
-                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: '#E8590C' }}>
+                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: '#D85A30' }}>
                         <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                         </svg>
@@ -272,13 +272,13 @@ export default function RegisterForm() {
           </section>
 
           {/* Basic Details Section */}
-          <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #E8590C' }}>
-            <h2 className="text-sm font-bold" style={{ color: '#1A1A1A' }}>
+          <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #D85A30' }}>
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
               Basic Details
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Full Name *
                 </label>
                 <input
@@ -287,10 +287,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -303,7 +303,7 @@ export default function RegisterForm() {
                 ) : null}
               </div>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   City *
                 </label>
                 <input
@@ -312,10 +312,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -328,7 +328,7 @@ export default function RegisterForm() {
                 ) : null}
               </div>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Pincode *
                 </label>
                 <input
@@ -339,10 +339,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -358,12 +358,12 @@ export default function RegisterForm() {
           </section>
 
           {selectedRole === 'contractor' ? (
-            <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #E8590C' }}>
-              <h2 className="text-sm font-bold" style={{ color: '#1A1A1A' }}>
+            <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #D85A30' }}>
+              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                 Contractor Details
               </h2>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Years of Experience
                 </label>
                 <input
@@ -374,10 +374,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -387,7 +387,7 @@ export default function RegisterForm() {
                 />
               </div>
               <div>
-                <label className="mb-3 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-3 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Specialisations
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -406,8 +406,8 @@ export default function RegisterForm() {
                         }
                         className="rounded-full px-3.5 py-2 text-xs font-semibold transition-all"
                         style={{
-                          backgroundColor: isSelected ? '#E8590C' : '#E0D5CC',
-                          color: isSelected ? 'white' : '#1A1A1A',
+                          backgroundColor: isSelected ? '#D85A30' : '#E0D5CC',
+                          color: isSelected ? 'white' : 'var(--text-primary)',
                         }}
                       >
                         {item}
@@ -417,7 +417,7 @@ export default function RegisterForm() {
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   About You
                 </label>
                 <textarea
@@ -427,10 +427,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all resize-none"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -446,12 +446,12 @@ export default function RegisterForm() {
           ) : null}
 
           {selectedRole === 'worker' ? (
-            <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #E8590C' }}>
-              <h2 className="text-sm font-bold" style={{ color: '#1A1A1A' }}>
+            <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #D85A30' }}>
+              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                 Worker Details
               </h2>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Your Trade *
                 </label>
                 <div className="mt-1 flex flex-wrap gap-2">
@@ -464,9 +464,9 @@ export default function RegisterForm() {
                         onClick={() => form.setValue('trade', trade, { shouldValidate: true, shouldDirty: true })}
                         className="rounded-full border px-3 py-2 text-xs font-semibold transition-all"
                         style={{
-                          backgroundColor: active ? '#E8590C' : '#FFFFFF',
-                          borderColor: active ? '#E8590C' : '#E0D5CC',
-                          color: active ? '#FFFFFF' : '#7A6F66',
+                          backgroundColor: active ? '#D85A30' : '#FFFFFF',
+                          borderColor: active ? '#D85A30' : '#E0D5CC',
+                          color: active ? '#FFFFFF' : 'var(--text-secondary)',
                         }}
                       >
                         {trade}
@@ -479,7 +479,7 @@ export default function RegisterForm() {
                 ) : null}
               </div>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Years of Experience
                 </label>
                 <input
@@ -490,10 +490,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -506,12 +506,12 @@ export default function RegisterForm() {
           ) : null}
 
           {selectedRole === 'supplier' ? (
-            <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #E8590C' }}>
-              <h2 className="text-sm font-bold" style={{ color: '#1A1A1A' }}>
+            <section className="space-y-4" style={{ backgroundColor: '#FFFFFF', padding: '24px', borderRadius: '12px', borderTop: '4px solid #D85A30' }}>
+              <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
                 Supplier Details
               </h2>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Shop Name *
                 </label>
                 <input
@@ -520,10 +520,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -536,7 +536,7 @@ export default function RegisterForm() {
                 ) : null}
               </div>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   Shop Address *
                 </label>
                 <input
@@ -545,10 +545,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -561,7 +561,7 @@ export default function RegisterForm() {
                 ) : null}
               </div>
               <div>
-                <label className="mb-3 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-3 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   What You Sell
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -580,8 +580,8 @@ export default function RegisterForm() {
                         }
                         className="rounded-full px-3.5 py-2 text-xs font-semibold transition-all"
                         style={{
-                          backgroundColor: isSelected ? '#E8590C' : '#E0D5CC',
-                          color: isSelected ? 'white' : '#1A1A1A',
+                          backgroundColor: isSelected ? '#D85A30' : '#E0D5CC',
+                          color: isSelected ? 'white' : 'var(--text-primary)',
                         }}
                       >
                         {item}
@@ -591,7 +591,7 @@ export default function RegisterForm() {
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-xs font-bold" style={{ color: '#1A1A1A' }}>
+                <label className="mb-2 block text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
                   WhatsApp Number
                 </label>
                 <input
@@ -600,10 +600,10 @@ export default function RegisterForm() {
                   className="w-full rounded-lg border-2 px-4 py-3 text-sm font-medium focus:outline-none transition-all"
                   style={{
                     borderColor: '#E0D5CC',
-                    color: '#1A1A1A',
+                    color: 'var(--text-primary)',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#E8590C'
+                    e.target.style.borderColor = '#D85A30'
                     e.target.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
                   }}
                   onBlur={(e) => {
@@ -628,7 +628,7 @@ export default function RegisterForm() {
             type="submit"
             disabled={isContinueDisabled || isSubmitting}
             className="w-full rounded-lg py-3.5 font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60"
-            style={{ backgroundColor: '#E8590C' }}
+            style={{ backgroundColor: '#D85A30' }}
           >
             {isSubmitting ? 'Creating profile...' : 'Create Profile'}
           </Button>

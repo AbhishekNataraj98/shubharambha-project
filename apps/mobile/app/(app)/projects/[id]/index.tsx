@@ -37,14 +37,14 @@ type ContractorProfilePayload = {
 function ProjectDetailSkeleton() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right']}>
-      <View style={{ flex: 1, backgroundColor: '#FAFAFA', padding: 16 }}>
+      <View style={{ flex: 1, backgroundColor: '#F2EDE8', padding: 16 }}>
         <View
           style={{
             height: 150,
             borderRadius: 14,
             backgroundColor: '#FFFFFF',
             borderWidth: 1,
-            borderColor: '#F3F4F6',
+            borderColor: '#F2EDE8',
             marginBottom: 12,
           }}
         />
@@ -54,7 +54,7 @@ function ProjectDetailSkeleton() {
             borderRadius: 12,
             backgroundColor: '#FFFFFF',
             borderWidth: 1,
-            borderColor: '#F3F4F6',
+            borderColor: '#F2EDE8',
             marginBottom: 12,
           }}
         />
@@ -64,7 +64,7 @@ function ProjectDetailSkeleton() {
             borderRadius: 12,
             backgroundColor: '#FFFFFF',
             borderWidth: 1,
-            borderColor: '#F3F4F6',
+            borderColor: '#F2EDE8',
           }}
         />
       </View>
@@ -221,7 +221,7 @@ export default function ProjectDetailScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top', 'left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         </View>
       </SafeAreaView>
     )
@@ -280,6 +280,9 @@ export default function ProjectDetailScreen() {
     onPressProjectImages: () => {
       router.push({ pathname: '/projects/[id]/images', params: { id: project.id } })
     },
+    onPressProjectOverview: () => {
+      router.push({ pathname: '/projects/[id]/overview', params: { id: project.id } })
+    },
     contractorAssigned: Boolean(project.contractor_id),
     hideStageTracker: workerDetails === '1' || workerInviteProject,
     showReportsTab: !(workerDetails === '1' || workerInviteProject),
@@ -287,7 +290,7 @@ export default function ProjectDetailScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right']}>
-      <View style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+      <View style={{ flex: 1, backgroundColor: '#F2EDE8' }}>
         {activeTab === 'updates' ? (
           <UpdatesTab
             projectId={project.id}

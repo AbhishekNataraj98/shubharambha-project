@@ -22,7 +22,7 @@ import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { DetailTab, FeedbackState, UpdateItem } from '@/components/project-detail/types'
 
-const BRAND = '#E8590C'
+const BRAND = '#D85A30'
 
 const STAGE_BG: Record<string, string> = {
   foundation: '#F1F5F9',
@@ -53,6 +53,7 @@ type UpdatesTabProps = {
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
     onPressProjectImages?: () => void
+    onPressProjectOverview?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -315,6 +316,7 @@ export function UpdatesTab({
         professionalRole={listHeaderProps.professionalRole}
         onPressProfessional={listHeaderProps.onPressProfessional}
       onPressProjectImages={listHeaderProps.onPressProjectImages}
+        onPressProjectOverview={listHeaderProps.onPressProjectOverview}
         contractorAssigned={listHeaderProps.contractorAssigned}
         hideStageTracker={listHeaderProps.hideStageTracker}
         showReportsTab={listHeaderProps.showReportsTab}
@@ -363,7 +365,7 @@ export function UpdatesTab({
           }
           const u = item.item
           const fb = feedbackByUpdate[u.id]
-          const stageBg = STAGE_BG[u.stageTag] ?? '#F3F4F6'
+          const stageBg = STAGE_BG[u.stageTag] ?? '#F2EDE8'
           const isHighlighted = highlightedUpdateId === u.id
           return (
             <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
@@ -373,7 +375,7 @@ export function UpdatesTab({
                   backgroundColor: isHighlighted ? '#FFF7ED' : '#FFFFFF',
                   overflow: 'hidden',
                   borderWidth: isHighlighted ? 2 : 1,
-                  borderColor: isHighlighted ? '#E8590C' : '#F3F4F6',
+                  borderColor: isHighlighted ? '#D85A30' : '#F2EDE8',
                 }}
               >
                 {u.photoUrls[0] ? (
@@ -437,7 +439,7 @@ export function UpdatesTab({
                       <Text style={{ fontSize: 12, color: '#4B5563' }}>Materials: {u.materialsUsed}</Text>
                     </View>
                   ) : null}
-                  <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 12 }}>
+                  <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F2EDE8', paddingTop: 12 }}>
                     <TouchableOpacity onPress={() => void toggleLike(u.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                       <Text style={{ fontSize: 13, color: fb?.likedByCurrentUser ? '#EF4444' : '#6B7280' }}>♥</Text>
                       <Text style={{ fontSize: 12, color: '#6B7280' }}>{fb?.likesCount ?? 0}</Text>
@@ -460,7 +462,7 @@ export function UpdatesTab({
                                 <Text style={{ fontSize: 11, color: BRAND, marginTop: 4 }}>Reply</Text>
                               </TouchableOpacity>
                               {c.replies.map((r) => (
-                                <View key={r.id} style={{ marginTop: 6, marginLeft: 8, padding: 6, backgroundColor: '#F3F4F6', borderRadius: 6 }}>
+                                <View key={r.id} style={{ marginTop: 6, marginLeft: 8, padding: 6, backgroundColor: '#F2EDE8', borderRadius: 6 }}>
                                   <Text style={{ fontSize: 11, fontWeight: '600' }}>{r.userName}</Text>
                                   <Text style={{ fontSize: 11, color: '#4B5563' }}>{r.content}</Text>
                                 </View>

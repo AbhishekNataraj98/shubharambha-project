@@ -51,7 +51,7 @@ export default function ProjectDetailTabs({
           defaultValue="updates"
           className="flex h-[68vh] min-h-[460px] flex-col overflow-hidden"
         >
-          <TabsList className="sticky top-0 z-10 shrink-0 bg-[#FAFAFA]">
+          <TabsList className="sticky top-0 z-10 shrink-0 bg-[#F2EDE8]">
             <TabsTrigger value="updates">Updates</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="chat">

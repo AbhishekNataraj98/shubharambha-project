@@ -50,7 +50,7 @@ const STATUS_CONFIG: Record<string, {
     label: 'In Progress', border: '#10B981',
   },
   completed: {
-    bg: '#F3F4F6', text: '#374151',
+    bg: '#F2EDE8', text: '#374151',
     label: 'Completed', border: '#9CA3AF',
   },
   cancelled: {
@@ -217,7 +217,7 @@ export default function DashboardScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#E8590C" />
+          <ActivityIndicator size="large" color="#D85A30" />
         </View>
       </SafeAreaView>
     )
@@ -249,8 +249,8 @@ export default function DashboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#E8590C"
-            colors={['#E8590C']}
+            tintColor="#D85A30"
+            colors={['#D85A30']}
           />
         }
       >
@@ -272,7 +272,7 @@ export default function DashboardScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Active Projects</Text>
               <Text style={styles.statValue}>{activeCount}</Text>
-              <View style={[styles.statIcon, { backgroundColor: '#FFF4EE' }]}>
+              <View style={[styles.statIcon, { backgroundColor: '#FBF0EB' }]}>
                 <Text style={{ fontSize: 16 }}>🏗️</Text>
               </View>
             </View>
@@ -403,7 +403,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#F5F4EF',
+    backgroundColor: '#F2EDE8',
   },
   scroll: {
     flex: 1,
@@ -435,18 +435,18 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1C1917',
+    color: '#2C2C2A',
     marginBottom: 10,
   },
   roleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FFF4EE',
+    backgroundColor: '#FBF0EB',
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
   },
   roleBadgeText: {
-    color: '#E8590C',
+    color: '#D85A30',
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'capitalize',
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#E8590C',
+    color: '#D85A30',
   },
   statIcon: {
     position: 'absolute',
@@ -503,18 +503,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#1C1917',
+    color: '#2C2C2A',
   },
   newButton: {
-    backgroundColor: '#FFF4EE',
+    backgroundColor: '#FBF0EB',
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#FDDCC4',
+    borderColor: '#F5DDD4',
   },
   newButtonText: {
-    color: '#E8590C',
+    color: '#D85A30',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
   projectName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1C1917',
+    color: '#2C2C2A',
     flex: 1,
     marginRight: 8,
   },
@@ -562,14 +562,14 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 5,
-    backgroundColor: '#F5F5F4',
+    backgroundColor: '#EDE8E3',
     borderRadius: 3,
     marginBottom: 10,
     overflow: 'hidden',
   },
   progressFill: {
     height: 5,
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
     borderRadius: 3,
   },
   projectCardBottom: {
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1C1917',
+    color: '#2C2C2A',
     marginBottom: 8,
   },
   emptySubtitle: {

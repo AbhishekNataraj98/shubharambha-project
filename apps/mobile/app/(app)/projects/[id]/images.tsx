@@ -16,7 +16,7 @@ import { useSessionState } from '@/lib/auth-state'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 import { uploadPhotoToWebApi } from '@/lib/uploadPhoto'
 
-const BRAND = '#E8590C'
+const BRAND = '#D85A30'
 const CUSTOMER_LOCK_MESSAGE = '7 threshold limit reached, customer can upload only after deleting existing image'
 const PROFESSIONAL_LOCK_MESSAGE = '20 threshold limit reached, contractor/worker can upload only after deleting existing image'
 const TOTAL_LOCK_MESSAGE = '27 threshold limit reached, upload only after deleting existing image'
@@ -229,7 +229,7 @@ export default function ProjectImagesScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -242,7 +242,7 @@ export default function ProjectImagesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right', 'bottom']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -282,7 +282,7 @@ export default function ProjectImagesScreen() {
         renderItem={({ item }) => {
           const canDelete = user.id === item.uploadedBy || profile?.role === 'customer' || profile?.role === 'contractor'
           return (
-            <View style={{ flex: 1, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', borderWidth: 1, borderColor: '#F3F4F6' }}>
+            <View style={{ flex: 1, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', borderWidth: 1, borderColor: '#F2EDE8' }}>
               <Image source={{ uri: item.imageUrl }} style={{ width: '100%', height: 156 }} resizeMode="cover" />
               <View style={{ padding: 10 }}>
                 <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>

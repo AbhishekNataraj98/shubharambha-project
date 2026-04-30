@@ -7,6 +7,8 @@ import BottomNav from '@/components/shared/bottom-nav'
 import ProfileAccountActions from '@/components/profile-account-actions'
 import InvitationActions from '@/components/shared/invitation-actions'
 import PaymentApprovalActions from '@/components/shared/payment-approval-actions'
+import ProfileEditForm from '@/components/profile-edit-form'
+import ProfessionalImagesManager from '@/components/professional-images-manager'
 
 function parseInviteSubject(subject: string) {
   const match = subject.match(/\[([0-9a-fA-F-]{36})\]:\s*(.+)$/)
@@ -28,32 +30,12 @@ function formatPhoneIndian(phone?: string | null) {
   return `+91 ${local.slice(0, 5)} ${local.slice(5)}`
 }
 
-function stageProgress(stage: string) {
-  const map: Record<string, number> = {
-    foundation: 10,
-    plinth: 25,
-    walls: 45,
-    slab: 60,
-    plastering: 80,
-    finishing: 100,
-  }
-  return map[stage] ?? 0
-}
-
 function getStatusBarColor(status: string) {
   if (status === 'on_hold') return '#F59E0B'
   if (status === 'active') return '#10B981'
   if (status === 'completed') return '#6B7280'
   if (status === 'cancelled') return '#EF4444'
   return '#E0D5CC'
-}
-
-function daysAgoText(dateValue?: string) {
-  if (!dateValue) return 'No updates yet'
-  const now = Date.now()
-  const then = new Date(dateValue).getTime()
-  const diffDays = Math.max(0, Math.floor((now - then) / (1000 * 60 * 60 * 24)))
-  return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
 }
 
 const stagePillClass: Record<string, string> = {
@@ -81,7 +63,7 @@ export default async function ProfilePage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('id,name,role,phone_number,city,pincode,bio')
+    .select('id,name,role,phone_number,city,pincode,bio,profile_photo_url')
     .eq('id', user.id)
     .maybeSingle()
   if (!profile) redirect('/register')
@@ -93,6 +75,8 @@ export default async function ProfilePage() {
 
   let specialisations: string[] = []
   let trade: string | null = null
+  let contractorYearsExperience = 0
+  let workerYearsExperience = 0
 
   if (profile.role === 'contractor') {
     const { data: contractorProfile } = await admin
@@ -107,6 +91,7 @@ export default async function ProfilePage() {
       : Array.isArray(record.specialization)
         ? (record.specialization as string[])
         : []
+    contractorYearsExperience = Number(record.years_experience ?? 0)
   }
 
   if (profile.role === 'worker') {
@@ -118,14 +103,58 @@ export default async function ProfilePage() {
 
     const record = (workerProfile ?? {}) as Record<string, unknown>
     trade = typeof record.trade === 'string' ? record.trade : Array.isArray(record.skill_tags) ? String((record.skill_tags as string[])[0] ?? '') : null
+    workerYearsExperience = Number(record.years_experience ?? 0)
   }
 
-  const { data: reviews } = await admin.from('reviews').select('rating').eq('reviewee_id', user.id)
+  const { data: professionalImagesRows } =
+    profile.role === 'contractor' || profile.role === 'worker'
+      ? await (admin as any)
+          .from('professional_images')
+          .select('id,image_url,created_at')
+          .eq('professional_id', user.id)
+          .order('created_at', { ascending: true })
+      : { data: [] as Array<{ id: string; image_url: string; created_at: string }> }
+  const professionalImages = (professionalImagesRows ?? []) as Array<{
+    id: string
+    image_url: string
+    created_at: string
+  }>
+
+  const { data: reviews } = await admin
+    .from('reviews')
+    .select('id,rating,comment,created_at,reviewer_id,project_id')
+    .eq('reviewee_id', user.id)
+    .order('created_at', { ascending: false })
   const reviewsCount = (reviews ?? []).length
   const avgRating =
     reviewsCount > 0
       ? Number(((reviews ?? []).reduce((sum, review) => sum + Number(review.rating), 0) / reviewsCount).toFixed(1))
       : 0
+  const { count: profileViewsCount } =
+    profile.role === 'contractor' || profile.role === 'worker'
+      ? await (admin as any)
+          .from('professional_profile_views')
+          .select('id', { count: 'exact', head: true })
+          .eq('professional_id', user.id)
+      : { count: 0 as number | null }
+  const reviewRows = (reviews ?? []) as Array<{
+    id: string
+    rating: number
+    comment: string | null
+    created_at: string
+    reviewer_id: string
+    project_id: string
+  }>
+  const reviewerIds = Array.from(new Set(reviewRows.map((review) => review.reviewer_id)))
+  const reviewedProjectIds = Array.from(new Set(reviewRows.map((review) => review.project_id)))
+  const { data: reviewUsers } = reviewerIds.length
+    ? await admin.from('users').select('id,name').in('id', reviewerIds)
+    : { data: [] as Array<{ id: string; name: string }> }
+  const reviewerNameById = new Map((reviewUsers ?? []).map((u) => [u.id, u.name]))
+  const { data: reviewedProjects } = reviewedProjectIds.length
+    ? await admin.from('projects').select('id,name').in('id', reviewedProjectIds)
+    : { data: [] as Array<{ id: string; name: string }> }
+  const reviewedProjectNameById = new Map((reviewedProjects ?? []).map((project) => [project.id, project.name]))
 
   let projectsCompleted = 0
   if (profile.role === 'contractor') {
@@ -147,90 +176,6 @@ export default async function ProfilePage() {
     }
   }
 
-  let recentProjects:
-    | Array<{
-        id: string
-        name: string
-        address: string
-        city: string
-        current_stage: string
-        status: string
-        contractor_id: string | null
-        customer_id: string
-      }>
-    = []
-
-  if (profile.role === 'customer') {
-    const { data } = await admin
-      .from('projects')
-      .select('id,name,address,city,current_stage,status,contractor_id,customer_id,created_at')
-      .eq('customer_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20)
-    const ownedProjects = (data ?? []) as typeof recentProjects
-    const ownedIds = ownedProjects.map((project) => project.id)
-    if (ownedIds.length > 0) {
-      const { data: members } = await admin
-        .from('project_members')
-        .select('project_id,user_id,role')
-        .in('project_id', ownedIds)
-      const memberRows = (members ?? []) as Array<{ project_id: string; user_id: string; role: string | null }>
-      recentProjects = ownedProjects
-        .filter((project) => {
-          if (project.contractor_id) return memberRows.some((m) => m.project_id === project.id && m.user_id === project.contractor_id)
-          return memberRows.some((m) => m.project_id === project.id && m.role === 'worker')
-        })
-        .slice(0, 3)
-    } else {
-      recentProjects = []
-    }
-  } else if (profile.role === 'contractor') {
-    const { data } = await admin
-      .from('projects')
-      .select('id,name,address,city,current_stage,status,contractor_id,customer_id,created_at')
-      .eq('contractor_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(3)
-    recentProjects = (data ?? []) as typeof recentProjects
-  } else {
-    const { data: memberships } = await admin
-      .from('project_members')
-      .select('project_id')
-      .eq('user_id', user.id)
-    const ids = Array.from(new Set((memberships ?? []).map((m) => m.project_id))).slice(0, 10)
-    if (ids.length) {
-      const { data } = await admin
-        .from('projects')
-        .select('id,name,address,city,current_stage,status,contractor_id,customer_id,created_at')
-        .in('id', ids)
-        .order('created_at', { ascending: false })
-        .limit(3)
-      recentProjects = (data ?? []) as typeof recentProjects
-    }
-  }
-
-  const recentProjectIds = recentProjects.map((project) => project.id)
-  const { data: recentProjectMembers } = recentProjectIds.length
-    ? await admin.from('project_members').select('project_id').in('project_id', recentProjectIds)
-    : { data: [] as Array<{ project_id: string }> }
-  const recentProjectHasMembers = new Set((recentProjectMembers ?? []).map((member) => member.project_id))
-  const { data: recentWorkerMembers } = recentProjectIds.length
-    ? await admin.from('project_members').select('project_id').in('project_id', recentProjectIds).eq('role', 'worker')
-    : { data: [] as Array<{ project_id: string }> }
-  const recentProjectHasWorkers = new Set((recentWorkerMembers ?? []).map((member) => member.project_id))
-  const { data: updates } = recentProjectIds.length
-    ? await admin
-        .from('daily_updates')
-        .select('project_id,created_at')
-        .in('project_id', recentProjectIds)
-        .order('created_at', { ascending: false })
-    : { data: [] as Array<{ project_id: string; created_at: string }> }
-  const latestUpdateByProject = new Map<string, string>()
-  for (const update of updates ?? []) {
-    if (!latestUpdateByProject.has(update.project_id)) {
-      latestUpdateByProject.set(update.project_id, update.created_at)
-    }
-  }
 
   const { data: receivedEnquiries } =
     profile.role === 'contractor' || profile.role === 'worker'
@@ -312,8 +257,14 @@ export default async function ProfilePage() {
     pendingInviteRoleMap.set(pair.inviteId, inferredRole)
   }
 
+  const receivedEnquiriesForDisplay = (receivedEnquiries ?? []).filter((invite) => invite.status !== 'responded')
+  const sentEnquiriesForDisplay = (sentEnquiries ?? []).filter((invite) => {
+    const approvedByMembership = approvedInviteMap.get(invite.id) === true
+    return invite.status !== 'responded' && !approvedByMembership
+  })
+
   return (
-    <div className="min-h-screen pb-32" style={{ backgroundColor: '#FAFAFA' }}>
+    <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2EDE8' }}>
       <div className="mx-auto w-full max-w-md px-4 pt-6">
         <section className="mb-6 flex justify-center">
           <div
@@ -321,19 +272,35 @@ export default async function ProfilePage() {
             style={{
               width: '88px',
               height: '88px',
-              backgroundColor: '#E8590C',
+              backgroundColor: '#D85A30',
               border: '3px solid white',
+              overflow: 'hidden',
             }}
           >
-            {initialsFromName(profile.name)}
+            {profile.profile_photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.profile_photo_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              profile.name?.trim()?.charAt(0)?.toUpperCase() || 'U'
+            )}
           </div>
         </section>
+
+        <ProfileEditForm
+          role={profile.role}
+          initialPhotoUrl={profile.profile_photo_url ?? ''}
+          initialCity={profile.city ?? ''}
+          initialPincode={profile.pincode ?? ''}
+          initialYearsExperience={contractorYearsExperience}
+          initialWorkerYearsExperience={workerYearsExperience}
+        />
+
         {/* Profile Info */}
         <section className="mb-6 text-center">
           <h2 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
             {profile.name}
           </h2>
-          <div className="mt-3 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: '#E8590C' }}>
+          <div className="mt-3 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: '#D85A30' }}>
             {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
           </div>
           <p className="mt-3 text-sm font-medium" style={{ color: '#7A6F66' }}>
@@ -348,7 +315,7 @@ export default async function ProfilePage() {
         {(profile.role === 'contractor' || profile.role === 'worker') && (
           <section className="mb-6 grid grid-cols-3 gap-3">
             <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+              <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
                 {avgRating.toFixed(1)}
               </p>
               <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
@@ -356,19 +323,19 @@ export default async function ProfilePage() {
               </p>
             </div>
             <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
-                {reviewsCount}
-              </p>
-              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                Reviews
-              </p>
-            </div>
-            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+              <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
                 {projectsCompleted}
               </p>
               <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
                 Completed
+              </p>
+            </div>
+            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+              <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
+                {profileViewsCount ?? 0}
+              </p>
+              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+                Profile views
               </p>
             </div>
           </section>
@@ -387,47 +354,6 @@ export default async function ProfilePage() {
           </section>
         ) : null}
 
-        {/* About */}
-        {profile.bio ? (
-          <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
-            <p className="mb-2 text-xs font-bold" style={{ color: '#999' }}>
-              ABOUT
-            </p>
-            <p className="text-sm font-medium leading-relaxed" style={{ color: '#1A1A1A' }}>
-              {profile.bio}
-            </p>
-          </section>
-        ) : null}
-
-        {/* Specialisations (Contractor) */}
-        {profile.role === 'contractor' ? (
-          <>
-            <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
-              <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
-                SPECIALISATIONS
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {specialisations.length ? (
-                  specialisations.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-                      style={{ backgroundColor: '#E8590C' }}
-                    >
-                      {item}
-                    </span>
-                  ))
-                ) : (
-                  <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
-                    Not added yet
-                  </p>
-                )}
-              </div>
-            </section>
-
-          </>
-        ) : null}
-
         {/* Trade (Worker) */}
         {profile.role === 'worker' ? (
           <>
@@ -438,7 +364,7 @@ export default async function ProfilePage() {
               {trade ? (
                 <span
                   className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-                  style={{ backgroundColor: '#E8590C' }}
+                  style={{ backgroundColor: '#D85A30' }}
                 >
                   {trade}
                 </span>
@@ -452,100 +378,28 @@ export default async function ProfilePage() {
           </>
         ) : null}
 
-        {/* Recent Projects */}
-        {recentProjects.length > 0 && (
-          <section className="mb-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-bold" style={{ color: '#1A1A1A' }}>
-                Recent Projects
-              </h3>
-              <Link href="/projects" className="text-sm font-semibold transition-colors hover:opacity-80" style={{ color: '#E8590C' }}>
-                View all →
-              </Link>
-            </div>
-            <div
-              className="space-y-3 pr-1"
-              style={{ maxHeight: recentProjects.length > 2 ? 360 : undefined, overflowY: recentProjects.length > 2 ? 'auto' : 'visible' }}
-            >
-              {recentProjects.map((project) => {
-                const progress = stageProgress(project.current_stage)
-                const effectiveStatus =
-                  (project.status === 'pending' || project.status === 'on_hold') && recentProjectHasMembers.has(project.id)
-                    ? 'active'
-                    : project.status
-                const statusBarColor = getStatusBarColor(effectiveStatus)
-                const hideStagePill = recentProjectHasWorkers.has(project.id)
-                return (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className="block rounded-lg bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                    style={{ borderLeft: `4px solid ${statusBarColor}` }}
-                  >
-                    <div className="p-4">
-                      <h4 className="text-base font-bold" style={{ color: '#1A1A1A' }}>
-                        {project.name}
-                      </h4>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <svg
-                          className="h-4 w-4 flex-shrink-0"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          style={{ color: '#7A6F66' }}
-                        >
-                          <path d="M12 2C7.6 2 4 5.6 4 10c0 5.1 8 12 8 12s8-6.9 8-12c0-4.4-3.6-8-8-8z" />
-                        </svg>
-                        <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
-                          {project.address}, {project.city}
-                        </p>
-                      </div>
-                      {!hideStagePill ? (
-                        <div className="mt-3 flex gap-2">
-                          <span
-                            className="rounded-full px-2.5 py-1 text-xs font-semibold"
-                            style={{ backgroundColor: '#FFF8F5', color: '#E8590C' }}
-                          >
-                            {project.current_stage.charAt(0).toUpperCase() + project.current_stage.slice(1)}
-                          </span>
-                        </div>
-                      ) : null}
-                      <div className="mt-4">
-                        <div className="h-1 rounded-full" style={{ backgroundColor: '#E0D5CC' }}>
-                          <div className="h-1 rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: '#E8590C' }} />
-                        </div>
-                        <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                          {progress}% complete
-                        </p>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between">
-                        <p className="text-xs font-medium" style={{ color: '#1A1A1A' }}>
-                          {profile.role === 'customer' ? 'Contractor:' : 'Customer:'}{' '}
-                          <span style={{ color: '#7A6F66' }}>Assigned</span>
-                        </p>
-                        <p className="text-xs font-medium" style={{ color: '#999' }}>
-                          {daysAgoText(latestUpdateByProject.get(project.id))}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+        {(profile.role === 'contractor' || profile.role === 'worker') ? (
+          <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
+              {(profile.role === 'contractor' ? contractorYearsExperience : workerYearsExperience)} years of experience
+            </p>
           </section>
-        )}
+        ) : null}
 
-        {(receivedEnquiries ?? []).length > 0 ? (
+        {(profile.role === 'contractor' || profile.role === 'worker') ? (
+          <ProfessionalImagesManager initialItems={professionalImages} canEdit />
+        ) : null}
+
+        {receivedEnquiriesForDisplay.length > 0 ? (
           <section id="invitations" className="mb-6 rounded-lg bg-white p-4 shadow-sm">
             <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
               WORK INVITATIONS
             </p>
             <div
               className="space-y-3 pr-1"
-              style={{ maxHeight: (receivedEnquiries ?? []).length > 2 ? 320 : undefined, overflowY: (receivedEnquiries ?? []).length > 2 ? 'auto' : 'visible' }}
+              style={{ maxHeight: receivedEnquiriesForDisplay.length > 2 ? 320 : undefined, overflowY: receivedEnquiriesForDisplay.length > 2 ? 'auto' : 'visible' }}
             >
-              {(receivedEnquiries ?? []).map((invite) => {
+              {receivedEnquiriesForDisplay.map((invite) => {
                 const parsed = parseInviteSubject(invite.subject)
                 const senderName = senderMap.get(invite.customer_id) ?? 'Customer'
                 const isPending = invite.status === 'open'
@@ -578,16 +432,16 @@ export default async function ProfilePage() {
           </section>
         ) : null}
 
-        {(sentEnquiries ?? []).length > 0 ? (
+        {sentEnquiriesForDisplay.length > 0 ? (
           <section className="mb-6 rounded-lg bg-white p-4 shadow-sm">
             <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
               INVITATIONS SENT
             </p>
             <div
               className="space-y-3 pr-1"
-              style={{ maxHeight: (sentEnquiries ?? []).length > 2 ? 320 : undefined, overflowY: (sentEnquiries ?? []).length > 2 ? 'auto' : 'visible' }}
+              style={{ maxHeight: sentEnquiriesForDisplay.length > 2 ? 320 : undefined, overflowY: sentEnquiriesForDisplay.length > 2 ? 'auto' : 'visible' }}
             >
-              {(sentEnquiries ?? []).map((invite) => {
+              {sentEnquiriesForDisplay.map((invite) => {
                 const parsed = parseInviteSubject(invite.subject)
                 const recipient = recipientMap.get(invite.recipient_id)
                 const approvedByMembership = approvedInviteMap.get(invite.id) === true
@@ -627,7 +481,7 @@ export default async function ProfilePage() {
                             : `/projects/${parsed.projectId}`
                         }
                         className="mt-3 inline-flex rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs font-semibold"
-                        style={{ color: '#E8590C' }}
+                        style={{ color: '#D85A30' }}
                       >
                         {recipient?.role === 'worker' ? 'Open worker details' : 'Open project details'}
                       </Link>
@@ -660,7 +514,7 @@ export default async function ProfilePage() {
                   <Link
                     href={`/projects/${payment.project_id}?tab=payments&paymentId=${payment.id}`}
                     className="mt-2 inline-flex rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs font-semibold"
-                    style={{ color: '#E8590C' }}
+                    style={{ color: '#D85A30' }}
                   >
                     Open payments tab
                   </Link>
@@ -671,8 +525,47 @@ export default async function ProfilePage() {
           </section>
         ) : null}
 
+        {(profile.role === 'contractor' || profile.role === 'worker') ? (
+          <section id="reviews" className="mb-6 rounded-lg bg-white p-4 shadow-sm">
+            <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
+              REVIEWS
+            </p>
+            {reviewRows.length === 0 ? (
+              <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
+                No reviews yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {reviewRows.map((review) => (
+                  <div
+                    key={review.id}
+                    className="rounded-xl border border-slate-100 bg-white p-3"
+                    style={{ borderLeft: '4px solid #D85A30' }}
+                  >
+                    <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>
+                      {reviewedProjectNameById.get(review.project_id) ?? 'Project'}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold" style={{ color: '#B45309' }}>
+                      {`★ ${Number(review.rating).toFixed(1)} · by ${reviewerNameById.get(review.reviewer_id) ?? 'Customer'}`}
+                    </p>
+                    {review.comment ? (
+                      <p className="mt-2 text-xs" style={{ color: '#7A6F66' }}>
+                        {review.comment}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
+                        No written comment
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+
         {/* Sign Out Button */}
-        <form action={signOutAction} className="mb-3">
+        <form action={signOutAction} className="mb-2">
           <button
             type="submit"
             className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors hover:bg-red-50"
@@ -684,7 +577,7 @@ export default async function ProfilePage() {
             Sign Out
           </button>
         </form>
-        <div className="mb-24">
+        <div className="mb-6">
           <ProfileAccountActions />
         </div>
       </div>

@@ -61,7 +61,7 @@ export default async function NotificationsPage() {
   const rows = notifications ?? []
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] pb-24">
+    <div className="min-h-screen bg-[#F2EDE8] pb-24">
       <header className="sticky top-0 z-20 border-b border-gray-100 bg-white">
         <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
           <h1 className="text-base font-semibold text-gray-900">Notifications</h1>

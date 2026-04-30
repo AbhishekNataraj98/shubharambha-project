@@ -33,11 +33,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const url = new URL(request.url)
   const projectId = url.searchParams.get('projectId')
+  const { data: viewer } = await supabase.from('users').select('id,role').eq('id', user.id).maybeSingle()
 
   const loadProfileByUserId = async (userId: string) =>
     admin
       .from('users')
-      .select('id,name,city,bio,phone_number,role,contractor_profiles(*),worker_profiles(*)')
+      .select('id,name,city,bio,phone_number,role,profile_photo_url,contractor_profiles(*),worker_profiles(*)')
       .eq('id', userId)
       .maybeSingle()
 
@@ -62,6 +63,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   if (!contractor || (contractor.role !== 'contractor' && contractor.role !== 'worker')) {
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  }
+
+  if (viewer?.role === 'customer') {
+    await (supabase as any).from('professional_profile_views').insert({
+      professional_id: contractor.id,
+      viewer_id: user.id,
+    })
   }
 
   const profile =
@@ -125,6 +133,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   })
   const completedProjectsWithPhoto = completedProjects.map(projectWithThumbnail)
   const ongoingProjectsWithPhoto = ongoingProjects.map(projectWithThumbnail)
+  const { data: professionalImagesRows } = await (admin as any)
+    .from('professional_images')
+    .select('id,image_url,created_at')
+    .eq('professional_id', contractor.id)
+    .order('created_at', { ascending: true })
 
   const { data: reviews } = await admin
     .from('reviews')
@@ -139,6 +152,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const reviewerNameById = new Map((reviewerUsers ?? []).map((row) => [row.id, row.name]))
 
   const totalReviews = (reviews ?? []).length
+  const { count: profileViewsCount } = await (admin as any)
+    .from('professional_profile_views')
+    .select('id', { count: 'exact', head: true })
+    .eq('professional_id', contractor.id)
   const avgRating =
     totalReviews > 0
       ? Number(
@@ -220,6 +237,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     name: contractor.name,
     city: contractor.city,
     phone_number: contractor.phone_number,
+    profile_photo_url: contractor.profile_photo_url ?? null,
     bio: contractor.bio,
     years_experience: Number(profileRecord.years_experience ?? 0),
     trade: contractor.role === 'worker' ? String(profileRecord.trade ?? profileRecord.skill_tags?.[0] ?? '') || null : null,
@@ -227,6 +245,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     service_cities: pickServiceCities(profileRecord),
     avg_rating: avgRating,
     review_count: totalReviews,
+    profile_views: profileViewsCount ?? 0,
     projects_completed: completedProjectsWithPhoto.length,
     projects_ongoing: ongoingProjectsWithPhoto.length,
     completed_projects: completedProjectsWithPhoto,
@@ -255,6 +274,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     reviews: (reviews ?? []).map((review) => ({
       ...review,
       reviewer_name: reviewerNameById.get(review.reviewer_id) ?? 'Customer',
+    })),
+    professional_images: (professionalImagesRows ?? []).map((item: { id: string; image_url: string; created_at: string }) => ({
+      id: item.id,
+      image_url: item.image_url,
+      created_at: item.created_at,
     })),
   })
 }

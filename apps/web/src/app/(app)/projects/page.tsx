@@ -168,7 +168,7 @@ export default async function ProjectsPage({
   }
 
   return (
-    <div className="min-h-screen px-4 py-5 pb-28" style={{ backgroundColor: '#FAFAFA' }}>
+    <div className="min-h-screen px-4 py-5 pb-28" style={{ backgroundColor: '#F2EDE8' }}>
       <div className="mx-auto w-full max-w-md">
         <header className="mb-5">
           <h1 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
@@ -186,7 +186,7 @@ export default async function ProjectsPage({
                 href={`/projects?status=${item}`}
                 className="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all"
                 style={{
-                  backgroundColor: active ? '#E8590C' : 'white',
+                  backgroundColor: active ? '#D85A30' : 'white',
                   color: active ? 'white' : '#7A6F66',
                   border: active ? 'none' : '2px solid #E0D5CC',
                 }}
@@ -221,7 +221,7 @@ export default async function ProjectsPage({
               <Link
                 href="/projects/new"
                 className="mt-4 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#E8590C' }}
+                style={{ backgroundColor: '#D85A30' }}
               >
                 Create Your First Project
               </Link>
@@ -278,7 +278,7 @@ export default async function ProjectsPage({
                             backgroundColor: stagePillClass[project.current_stage]?.includes('bg-') 
                               ? '#FFF8F5' 
                               : '#E0D5CC',
-                            color: '#E8590C',
+                            color: '#D85A30',
                           }}
                         >
                           {project.current_stage.charAt(0).toUpperCase() + project.current_stage.slice(1)}
@@ -291,7 +291,7 @@ export default async function ProjectsPage({
                       <div className="h-1 rounded-full" style={{ backgroundColor: '#E0D5CC' }}>
                         <div
                           className="h-1 rounded-full transition-all"
-                          style={{ width: `${progress}%`, backgroundColor: '#E8590C' }}
+                          style={{ width: `${progress}%`, backgroundColor: '#D85A30' }}
                         />
                       </div>
                       <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
@@ -322,7 +322,7 @@ export default async function ProjectsPage({
         <Link
           href="/projects/new"
           className="fixed right-6 bottom-28 z-30 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white transition-transform hover:scale-110 shadow-lg"
-          style={{ backgroundColor: '#E8590C' }}
+          style={{ backgroundColor: '#D85A30' }}
           aria-label="Create new project"
         >
           +

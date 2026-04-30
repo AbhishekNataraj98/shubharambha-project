@@ -10,6 +10,8 @@ type ContractorItem = {
   id: string
   name: string
   city: string
+  profile_photo_url: string | null
+  profile_images: string[]
   profile_kind: 'contractor' | 'worker'
   trade: string | null
   avg_rating: number
@@ -20,6 +22,7 @@ type ContractorItem = {
 }
 
 const profilePills = ['Contractor', 'Mason', 'Plumber', 'Carpenter', 'Electrician', 'Painter'] as const
+const sortPills = ['Top rated', 'Most experienced'] as const
 
 function initials(name: string) {
   return name
@@ -45,6 +48,7 @@ export default function ContractorsPage() {
   const [profileType, setProfileType] = useState<(typeof profilePills)[number]>('Contractor')
   const [isLoading, setIsLoading] = useState(false)
   const [contractors, setContractors] = useState<ContractorItem[]>([])
+  const [sortBy, setSortBy] = useState<(typeof sortPills)[number]>('Top rated')
 
   const projectDraftMode = searchParams.get('projectDraft') === 'true'
   const projectId = searchParams.get('projectId')
@@ -77,34 +81,26 @@ export default function ContractorsPage() {
     void fetchContractors()
   }, [city, profileType])
 
-  const filteredContractors = useMemo(() => contractors, [contractors])
+  const filteredContractors = useMemo(() => {
+    const list = [...contractors]
+    if (sortBy === 'Top rated') {
+      list.sort((a, b) => b.avg_rating - a.avg_rating || b.total_reviews - a.total_reviews)
+    } else {
+      list.sort((a, b) => b.years_experience - a.years_experience || b.avg_rating - a.avg_rating)
+    }
+    return list
+  }, [contractors, sortBy])
 
   return (
-    <div className="min-h-screen px-4 py-5 pb-28" style={{ backgroundColor: '#FAFAFA' }}>
-      <div className="mx-auto w-full max-w-md">
-        {projectDraftMode && (
-          <div className="fixed inset-x-0 bottom-24 z-10 px-4 py-3" style={{ backgroundColor: '#E8590C' }}>
-            <div className="mx-auto max-w-md text-center font-semibold text-white">
-              Select a contractor to proceed
-            </div>
-          </div>
-        )}
+    <div className="min-h-screen bg-[#F2EDE8] pb-28">
+      <div className="sticky top-0 z-30 border-b border-gray-100 bg-white">
+        <div className="mx-auto w-full max-w-md px-4 py-3">
+          <h1 className="text-xl font-bold text-gray-900">Find professionals</h1>
+          <p className="mt-0.5 text-sm text-gray-500">Discover trusted professionals near you</p>
 
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
-            Find Contractors
-          </h1>
-          <p className="mt-1 text-sm font-medium" style={{ color: '#7A6F66' }}>
-            Discover trusted professionals for your project
-          </p>
-        </header>
-
-        <div className="mb-6 space-y-3">
-          {/* Search Bar */}
-          <div className="relative">
+          <div className="relative mt-3">
             <svg
-              className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2"
-              style={{ color: '#E8590C' }}
+              className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-orange-500"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -122,25 +118,26 @@ export default function ContractorsPage() {
                   setContractors([])
                 }
               }}
-              placeholder="Search by city"
-              className="w-full rounded-lg border-2 pl-10 pr-4 py-3 text-sm font-medium focus:outline-none transition-all"
+              placeholder="Search by city..."
+              className="w-full rounded-2xl border border-gray-200 bg-gray-50 pl-10 pr-4 py-3 text-sm text-gray-900 focus:outline-none"
               style={{
-                borderColor: '#E0D5CC',
-                color: '#1A1A1A',
+                borderColor: '#E5E7EB',
+                backgroundColor: '#F9FAFB',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#E8590C'
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(232, 89, 12, 0.1)'
+                e.currentTarget.style.borderColor = '#FB923C'
+                e.currentTarget.style.backgroundColor = '#FFFFFF'
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(251,146,60,0.10)'
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#E0D5CC'
+                e.currentTarget.style.borderColor = '#E5E7EB'
+                e.currentTarget.style.backgroundColor = '#F9FAFB'
                 e.currentTarget.style.boxShadow = 'none'
               }}
             />
           </div>
 
-          {/* Profile Type Pills */}
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {profilePills.map((pill) => {
               const active = profileType === pill
               return (
@@ -148,11 +145,11 @@ export default function ContractorsPage() {
                   key={pill}
                   type="button"
                   onClick={() => setProfileType(pill)}
-                  className="rounded-full border-2 px-3 py-1.5 text-xs font-semibold transition-all"
+                  className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium"
                   style={{
-                    borderColor: active ? '#E8590C' : '#E0D5CC',
-                    backgroundColor: active ? '#FFF8F5' : 'white',
-                    color: active ? '#E8590C' : '#7A6F66',
+                    border: `1px solid ${active ? '#F97316' : '#E5E7EB'}`,
+                    backgroundColor: active ? '#F97316' : '#FFFFFF',
+                    color: active ? '#FFFFFF' : '#4B5563',
                   }}
                 >
                   {pill}
@@ -160,24 +157,134 @@ export default function ContractorsPage() {
               )
             })}
           </div>
+
+          <div className="mt-2 flex items-center justify-between">
+            <p className="text-xs text-gray-500">{`${filteredContractors.length} professionals found`}</p>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as (typeof sortPills)[number])}
+              className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 outline-none"
+            >
+              {sortPills.map((pill) => (
+                <option key={pill} value={pill}>
+                  {pill}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-md">
+        {projectDraftMode ? (
+          <div className="mx-4 mt-3 flex items-center gap-3 rounded-2xl bg-orange-500 px-4 py-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-400">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M3 10.5L12 3l9 7.5" />
+                <path d="M5.5 9.5V20h13V9.5" />
+                <path d="M10 20v-5h4v5" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Select a contractor for your project</p>
+              <p className="mt-0.5 text-xs text-orange-100">Tap a profile below to send an invitation</p>
+            </div>
+          </div>
+        ) : null}
+
+        {filteredContractors.length > 0 && !isLoading ? (
+          <>
+            <div className="mb-3 mt-4 flex items-center justify-between px-4">
+              <p className="text-sm font-bold text-gray-900">Top rated</p>
+              <button type="button" className="text-xs text-orange-500">See all</button>
+            </div>
+            <div className="flex gap-3 overflow-x-auto px-4 pb-2" style={{ scrollbarWidth: 'none' }}>
+              {filteredContractors.slice(0, 3).map((contractor) => (
+                <Link
+                  key={`featured-${contractor.id}`}
+                  prefetch={false}
+                  href={`/contractors/${contractor.id}?projectDraft=${projectDraftMode ? 'true' : 'false'}${
+                    projectId ? `&projectId=${projectId}` : ''
+                  }`}
+                  onClick={(e) => {
+                    const now = Date.now()
+                    if (now - lastProfileLinkAtRef.current < PROFILE_LINK_DEBOUNCE_MS) {
+                      e.preventDefault()
+                      return
+                    }
+                    lastProfileLinkAtRef.current = now
+                  }}
+                  className="min-w-[150px] w-[150px]"
+                >
+                  <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                    <div className="relative h-[90px] bg-gray-100">
+                      {contractor.profile_images[0] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={contractor.profile_images[0]} alt={contractor.name} className="h-full w-full object-cover" />
+                      ) : contractor.profile_photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={contractor.profile_photo_url} alt={contractor.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-400">
+                          <svg viewBox="0 0 24 24" className="h-8 w-8 opacity-60" fill="currentColor">
+                            <polygon points="12,3 2.5,10.5 4.2,10.5 4.2,21 9.8,21 9.8,14.5 14.2,14.5 14.2,21 19.8,21 19.8,10.5 21.5,10.5" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="absolute bottom-2 right-2 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                        {`★ ${contractor.avg_rating.toFixed(1)}`}
+                      </div>
+                      <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-white bg-orange-500 text-[10px] font-bold text-white">
+                        {contractor.profile_photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={contractor.profile_photo_url} alt={contractor.name} className="h-full w-full object-cover" />
+                        ) : (
+                          initials(contractor.name)
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-2.5">
+                      <p className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold text-gray-900">{contractor.name}</p>
+                      <p className="mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-gray-500">{contractor.city}</p>
+                      <span className="mt-1.5 inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-full bg-orange-50 px-2 py-0.5 text-[10px] text-orange-700">
+                        {contractor.specialisations[0] || contractor.trade || 'Professional'}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        <div className="mb-3 mt-5 px-4">
+          <p className="text-sm font-bold text-gray-900">All professionals</p>
         </div>
 
-        {/* Contractors List */}
-        <div className="space-y-3">
-          {isLoading ? (
-            <>
-              <div className="h-32 animate-pulse rounded-lg bg-gray-200" />
-              <div className="h-32 animate-pulse rounded-lg bg-gray-200" />
-            </>
-          ) : filteredContractors.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-center" style={{ borderColor: '#E0D5CC', backgroundColor: '#FFFBF7' }}>
-              <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
-                No {profileType} found in {city || 'this city'}. Try nearby city.
-              </p>
+        {isLoading ? (
+          <div className="space-y-4 px-4">
+            <div className="h-[200px] animate-pulse rounded-2xl bg-gray-100" />
+            <div className="h-[200px] animate-pulse rounded-2xl bg-gray-100" />
+            <div className="h-[200px] animate-pulse rounded-2xl bg-gray-100" />
+          </div>
+        ) : filteredContractors.length === 0 ? (
+          <div className="mx-4 rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center text-gray-300">
+              <svg viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor">
+                <polygon points="12,3 2.5,10.5 4.2,10.5 4.2,21 9.8,21 9.8,14.5 14.2,14.5 14.2,21 19.8,21 19.8,10.5 21.5,10.5" />
+              </svg>
             </div>
-          ) : (
-            filteredContractors.map((contractor) => {
-              const isContractor = contractor.profile_kind === 'contractor'
+            <p className="mt-3 font-semibold text-gray-600">No professionals found</p>
+            <p className="mt-1 text-sm text-gray-400">Try searching a nearby city like Secunderabad or Medchal</p>
+          </div>
+        ) : (
+          <div className="space-y-4 px-4">
+            {filteredContractors.map((contractor) => {
+              const hasHeroPhoto = Boolean(contractor.profile_images[0])
+              const hasAnyPhoto = Boolean(contractor.profile_images[0] || contractor.profile_photo_url)
+              const topSpecs = contractor.specialisations.slice(0, 3)
+              const hasMoreSpecs = contractor.specialisations.length > 3
+              const moreSpecs = contractor.specialisations.length - 3
               return (
                 <Link
                   key={contractor.id}
@@ -194,65 +301,143 @@ export default function ContractorsPage() {
                     lastProfileLinkAtRef.current = now
                   }}
                 >
-                  <div className="flex items-start gap-4 rounded-lg bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
-                    {/* Avatar */}
-                    <div
-                      className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                      style={{ backgroundColor: '#E8590C' }}
-                    >
-                      {initials(contractor.name)}
+                  <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-transform active:scale-[0.99]">
+                    <div className={`relative ${hasAnyPhoto ? 'h-[140px]' : 'h-[80px]'} ${hasAnyPhoto ? '' : 'bg-gray-50'}`}>
+                      {hasHeroPhoto ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={contractor.profile_images[0]} alt={contractor.name} className="absolute inset-0 h-full w-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                        </>
+                      ) : hasAnyPhoto ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={contractor.profile_photo_url ?? ''} alt={contractor.name} className="absolute inset-0 h-full w-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                        </>
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-300">
+                          <svg viewBox="0 0 24 24" className="h-9 w-9 opacity-20" fill="currentColor">
+                            <polygon points="12,3 2.5,10.5 4.2,10.5 4.2,21 9.8,21 9.8,14.5 14.2,14.5 14.2,21 19.8,21 19.8,10.5 21.5,10.5" />
+                          </svg>
+                        </div>
+                      )}
+
+                      <div className="absolute left-0 right-0 bottom-0 flex items-end gap-3 p-3">
+                        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-white/40 bg-orange-500 text-sm font-bold text-white">
+                          {contractor.profile_photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={contractor.profile_photo_url} alt={contractor.name} className="h-full w-full object-cover" />
+                          ) : (
+                            initials(contractor.name)
+                          )}
+                        </div>
+                        {hasAnyPhoto ? (
+                          <div className="flex-1">
+                            <p className="text-[15px] font-bold leading-tight text-white">{contractor.name}</p>
+                            <p className="mt-0.5 text-[11px] text-white/80">{contractor.city}</p>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {contractor.avg_rating >= 4.5 ? (
+                        <div className="absolute right-3 top-3 rounded-full bg-orange-500 px-2 py-1 text-[10px] font-bold text-white">
+                          ⭐ Top rated
+                        </div>
+                      ) : contractor.projects_completed >= 10 ? (
+                        <div className="absolute right-3 top-3 rounded-full bg-gray-900/70 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm">
+                          {`${contractor.projects_completed} projects`}
+                        </div>
+                      ) : null}
                     </div>
 
-                    {/* Info */}
-                    <div className="flex-1">
-                      <h2 className="font-bold" style={{ color: '#1A1A1A' }}>
-                        {contractor.name}
-                      </h2>
-                      <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
-                        {contractor.city}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold" style={{ color: '#374151' }}>
-                        {isContractor ? 'Contractor' : contractor.trade ?? 'Worker'}
-                      </p>
+                    <div className="p-4">
+                      {!hasAnyPhoto ? (
+                        <div className="mb-2">
+                          <p className="text-[15px] font-bold leading-tight text-gray-900">{contractor.name}</p>
+                          <p className="mt-0.5 text-[11px] text-gray-500">{contractor.city}</p>
+                        </div>
+                      ) : null}
 
-                      {/* Rating */}
-                      <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold" style={{ color: '#B8860B' }}>
-                        {starText(contractor.avg_rating)}{' '}
-                        <span style={{ color: '#7A6F66' }}>
-                          {contractor.avg_rating.toFixed(1)} ({contractor.total_reviews})
-                        </span>
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm text-amber-400">{starText(contractor.avg_rating)}</p>
+                          <p className="text-sm font-semibold text-gray-900">{contractor.avg_rating.toFixed(1)}</p>
+                          <p className="text-xs text-gray-400">{`(${contractor.total_reviews} reviews)`}</p>
+                        </div>
+                        <p className="text-xs text-gray-500">{`${contractor.years_experience} yrs exp`}</p>
+                      </div>
 
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {contractor.specialisations.slice(0, 2).map((spec) => (
-                          <span key={spec} className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: '#E0D5CC', color: '#1A1A1A' }}>
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {topSpecs.map((spec) => (
+                          <span key={spec} className="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-medium text-orange-700">
                             {spec}
                           </span>
                         ))}
+                        {hasMoreSpecs ? (
+                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] text-gray-500">
+                            {`+${moreSpecs} more`}
+                          </span>
+                        ) : null}
+                        {contractor.profile_kind === 'worker' && contractor.trade ? (
+                          <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-medium text-teal-700">
+                            {contractor.trade}
+                          </span>
+                        ) : null}
                       </div>
 
-                      {/* Projects badge */}
-                      <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                        {contractor.projects_completed} project{contractor.projects_completed !== 1 ? 's' : ''} completed
-                      </p>
-                    </div>
+                      {contractor.profile_images.length > 0 ? (
+                        <div className="mt-3 flex gap-2">
+                          {contractor.profile_images.slice(0, 3).map((img, idx) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={`${contractor.id}-gallery-${idx}`}
+                              src={img}
+                              alt={`${contractor.name} profile ${idx + 1}`}
+                              className="h-[52px] w-[72px] rounded-xl border border-gray-100 object-cover"
+                            />
+                          ))}
+                          {contractor.profile_images.length > 3 ? (
+                            <div className="flex h-[52px] w-[72px] items-center justify-center rounded-xl bg-gray-100 text-xs font-medium text-gray-500">
+                              {`+${contractor.profile_images.length - 3}`}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
 
-                    <svg
-                      className="h-5 w-5 flex-shrink-0"
-                      style={{ color: '#E8590C' }}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M9 5l7 7-7 7" />
-                    </svg>
+                      <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                        <div className="flex gap-4">
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-orange-500">{contractor.projects_completed}</p>
+                            <p className="mt-0.5 text-[10px] text-gray-400">Projects</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-orange-500">{contractor.total_reviews}</p>
+                            <p className="mt-0.5 text-[10px] text-gray-400">Reviews</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-orange-500">{`${contractor.years_experience}y`}</p>
+                            <p className="mt-0.5 text-[10px] text-gray-400">Exp</p>
+                          </div>
+                        </div>
+                        <span
+                          className="rounded-xl px-4 py-2 text-xs font-semibold"
+                          style={{
+                            backgroundColor: projectDraftMode ? '#F97316' : '#FFF7ED',
+                            color: projectDraftMode ? '#FFFFFF' : '#EA580C',
+                            border: projectDraftMode ? 'none' : '1px solid #FED7AA',
+                          }}
+                        >
+                          {projectDraftMode ? 'Invite' : 'View profile'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </Link>
               )
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       <BottomNav />

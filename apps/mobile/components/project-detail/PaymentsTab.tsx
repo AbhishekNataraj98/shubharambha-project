@@ -19,7 +19,7 @@ import { formatINR } from '@/lib/utils'
 import { ProjectHeroAndStage } from '@/components/project-detail/ProjectChrome'
 import type { DetailTab, PaymentFormData, PaymentItem, PaymentsFilter } from '@/components/project-detail/types'
 
-const BRAND = '#E8590C'
+const BRAND = '#D85A30'
 
 type PaymentsTabProps = {
   projectId: string
@@ -42,6 +42,7 @@ type PaymentsTabProps = {
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
     onPressProjectImages?: () => void
+    onPressProjectOverview?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -65,7 +66,7 @@ function categoryVisual(category: PaymentItem['paidToCategory']): { label: strin
   if (category === 'labour') return { label: 'Labour Payment', badge: 'L', bg: '#DBEAFE', fg: '#2563EB' }
   if (category === 'material') return { label: 'Material Payment', badge: 'M', bg: '#D1FAE5', fg: '#059669' }
   if (category === 'contractor_fee') return { label: 'Contractor Payment', badge: 'C', bg: '#FFEDD5', fg: BRAND }
-  return { label: 'Other Payment', badge: 'O', bg: '#F3F4F6', fg: '#4B5563' }
+  return { label: 'Other Payment', badge: 'O', bg: '#F2EDE8', fg: '#4B5563' }
 }
 
 type MonthGroup = { month: string; items: PaymentItem[] }
@@ -251,6 +252,7 @@ export function PaymentsTab({
         professionalRole={listHeaderProps.professionalRole}
         onPressProfessional={listHeaderProps.onPressProfessional}
       onPressProjectImages={listHeaderProps.onPressProjectImages}
+        onPressProjectOverview={listHeaderProps.onPressProjectOverview}
         contractorAssigned={listHeaderProps.contractorAssigned}
         hideStageTracker={listHeaderProps.hideStageTracker}
         showReportsTab={listHeaderProps.showReportsTab}
@@ -288,7 +290,7 @@ export function PaymentsTab({
                   paddingHorizontal: 12,
                   paddingVertical: 8,
                   minHeight: 48,
-                  backgroundColor: active ? BRAND : '#F3F4F6',
+                  backgroundColor: active ? BRAND : '#F2EDE8',
                 }}
               >
                 <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#FFFFFF' : '#4B5563' }}>{pill.label}</Text>
@@ -373,11 +375,11 @@ export function PaymentsTab({
                 marginBottom: 12,
                 borderRadius: 16,
                 borderLeftWidth: 4,
-                borderLeftColor: isHighlighted ? '#E8590C' : borderLeft,
+                borderLeftColor: isHighlighted ? '#D85A30' : borderLeft,
                 backgroundColor: bg,
                 padding: 14,
                 borderWidth: isHighlighted ? 2 : professionalNeedsAction ? 2 : 1,
-                borderColor: isHighlighted ? '#E8590C' : professionalNeedsAction ? '#FDBA74' : '#F3F4F6',
+                borderColor: isHighlighted ? '#D85A30' : professionalNeedsAction ? '#FDBA74' : '#F2EDE8',
               }}
             >
               <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -663,7 +665,7 @@ function LogPaymentModal({
                       minHeight: 40,
                       paddingHorizontal: 10,
                       borderRadius: 999,
-                      backgroundColor: sel ? BRAND : '#F3F4F6',
+                      backgroundColor: sel ? BRAND : '#F2EDE8',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -688,7 +690,7 @@ function LogPaymentModal({
                       minHeight: 48,
                       paddingHorizontal: 12,
                       borderRadius: 999,
-                      backgroundColor: sel ? BRAND : '#F3F4F6',
+                      backgroundColor: sel ? BRAND : '#F2EDE8',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}

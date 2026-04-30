@@ -57,14 +57,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     ? await supabase.from('users').select('id,name,role').in('id', uploaderIds)
     : { data: [] as Array<{ id: string; name: string; role: string }> }
   const uploaderMap = new Map((uploaders ?? []).map((row) => [row.id, row.name]))
-  const uploaderRoleMap = new Map((uploaders ?? []).map((row) => [row.id, row.role]))
 
   let customerCount = 0
   let professionalCount = 0
   for (const row of rows ?? []) {
-    const role = uploaderRoleMap.get(row.uploaded_by)
-    if (role === 'customer') customerCount += 1
-    else if (role === 'contractor' || role === 'worker') professionalCount += 1
+    if (row.uploaded_by === access.project?.customer_id) customerCount += 1
+    else professionalCount += 1
   }
 
   return NextResponse.json({
@@ -120,18 +118,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: existingError.message }, { status: 400 })
   }
 
-  const existingUploaderIds = Array.from(new Set((existingRows ?? []).map((row) => row.uploaded_by)))
-  const { data: existingUploaders } = existingUploaderIds.length
-    ? await supabase.from('users').select('id,role').in('id', existingUploaderIds)
-    : { data: [] as Array<{ id: string; role: string }> }
-  const existingRoleMap = new Map((existingUploaders ?? []).map((row) => [row.id, row.role]))
-
   let customerCount = 0
   let professionalCount = 0
   for (const row of existingRows ?? []) {
-    const role = existingRoleMap.get(row.uploaded_by)
-    if (role === 'customer') customerCount += 1
-    else if (role === 'contractor' || role === 'worker') professionalCount += 1
+    if (row.uploaded_by === access.project?.customer_id) customerCount += 1
+    else professionalCount += 1
   }
   const totalCount = (existingRows ?? []).length
 
@@ -176,7 +167,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       projectId: data.project_id,
       imageUrl: data.image_url,
       uploadedBy: data.uploaded_by,
-      uploaderName: actor.role === 'contractor' ? 'Contractor' : 'Worker',
+      uploaderName: actor.role === 'customer' ? 'Customer' : actor.role === 'contractor' ? 'Contractor' : 'Worker',
       createdAt: data.created_at,
     },
   })

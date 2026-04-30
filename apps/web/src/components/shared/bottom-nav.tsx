@@ -70,7 +70,7 @@ export default function BottomNav() {
               key={item.href}
               href={item.href}
               className="flex flex-col items-center gap-1 transition-colors"
-              style={{ color: active ? '#E8590C' : '#999' }}
+              style={{ color: active ? '#D85A30' : '#999' }}
             >
               {item.icon}
               <span className={`text-xs ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>

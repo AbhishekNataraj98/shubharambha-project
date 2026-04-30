@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import InviteContractorBar from '@/components/shared/invite-contractor-bar'
 import ReviewInviteForm from '@/components/shared/review-invite-form'
+import ProfessionalImagesManager from '@/components/professional-images-manager'
 import type { Database } from '@/types/supabase'
 
 const INVITE_BLOCKING_STATUSES: Database['public']['Enums']['project_status'][] = ['active', 'on_hold']
@@ -62,11 +63,18 @@ export default async function ContractorProfilePage({
 
   const { data: contractor } = await admin
     .from('users')
-    .select('id,name,city,bio,phone_number,role,contractor_profiles(*),worker_profiles(*)')
+    .select('id,name,city,bio,phone_number,role,profile_photo_url,contractor_profiles(*),worker_profiles(*)')
     .eq('id', id)
     .maybeSingle()
 
   if (!contractor || (contractor.role !== 'contractor' && contractor.role !== 'worker')) redirect('/contractors')
+
+  if (viewer?.role === 'customer') {
+    await (admin as any).from('professional_profile_views').insert({
+      professional_id: contractor.id,
+      viewer_id: user.id,
+    })
+  }
 
   const profile =
     contractor.role === 'contractor'
@@ -155,6 +163,20 @@ export default async function ContractorProfilePage({
   const activeCitiesCount = new Set(
     ongoingPortfolioProjects.map((project) => (project.city ?? '').trim()).filter(Boolean)
   ).size
+  const { count: profileViewsCount } = await (admin as any)
+    .from('professional_profile_views')
+    .select('id', { count: 'exact', head: true })
+    .eq('professional_id', contractor.id)
+  const { data: professionalImagesRows } = await (admin as any)
+    .from('professional_images')
+    .select('id,image_url,created_at')
+    .eq('professional_id', contractor.id)
+    .order('created_at', { ascending: true })
+  const professionalImages = (professionalImagesRows ?? []) as Array<{
+    id: string
+    image_url: string
+    created_at: string
+  }>
 
   const { data: reviews } = await admin
     .from('reviews')
@@ -254,7 +276,7 @@ export default async function ContractorProfilePage({
     : null
 
   return (
-    <div className="min-h-screen pb-32" style={{ backgroundColor: '#FAFAFA' }}>
+    <div className="min-h-screen pb-32" style={{ backgroundColor: '#F2EDE8' }}>
       {/* Cream-orange hero — lighter than app header, matches mobile profile */}
       <div
         className="border-t border-b px-4 py-8"
@@ -270,16 +292,21 @@ export default async function ContractorProfilePage({
           <div className="flex items-end gap-4">
             <div
               className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full border-2 bg-white text-4xl font-bold"
-              style={{ borderColor: 'rgba(232, 89, 12, 0.35)', color: '#E8590C' }}
+              style={{ borderColor: 'rgba(232, 89, 12, 0.35)', color: '#D85A30', overflow: 'hidden' }}
             >
-              {initials(contractor.name)}
+              {contractor.profile_photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={contractor.profile_photo_url} alt={contractor.name} className="h-full w-full object-cover" />
+              ) : (
+                initials(contractor.name)
+              )}
             </div>
             <div className="pb-2">
               <h1 className="text-2xl font-bold text-gray-900">{contractor.name}</h1>
               <p className="mt-1 text-sm font-medium text-stone-600">
                 {contractor.city} · {yearsExperience} years
               </p>
-              <p className="mt-1 text-sm font-bold" style={{ color: '#E8590C' }}>
+              <p className="mt-1 text-sm font-bold" style={{ color: '#D85A30' }}>
                 {contractor.role === 'contractor' ? 'Contractor' : trade || 'Worker'}
               </p>
               <p className="mt-1 text-sm font-medium text-gray-600">
@@ -301,7 +328,7 @@ export default async function ContractorProfilePage({
               <span
                 key={item}
                 className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-                style={{ backgroundColor: '#E8590C' }}
+                style={{ backgroundColor: '#D85A30' }}
               >
                 {item}
               </span>
@@ -324,7 +351,7 @@ export default async function ContractorProfilePage({
         {/* Stats Row */}
         <section className="mb-6 grid grid-cols-2 gap-3">
           <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
               {portfolioProjects.length}
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
@@ -332,23 +359,31 @@ export default async function ContractorProfilePage({
             </p>
           </div>
           <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
               {ongoingPortfolioProjects.length}
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
               Ongoing Projects
             </p>
           </div>
-          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+          <a href="#reviews" className="rounded-lg bg-white p-4 text-center shadow-sm">
+            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
               {averageRating.toFixed(1)}
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
               Avg Rating
             </p>
+          </a>
+          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
+            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
+              {profileViewsCount ?? 0}
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
+              Profile Views
+            </p>
           </div>
           <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#E8590C' }}>
+            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
               {activeCitiesCount}
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
@@ -402,8 +437,10 @@ export default async function ContractorProfilePage({
           </section>
         )}
 
+        <ProfessionalImagesManager initialItems={professionalImages} canEdit={false} />
+
         {/* Reviews Section */}
-        <section>
+        <section id="reviews">
           <h2 className="mb-4 text-lg font-bold" style={{ color: '#1A1A1A' }}>
             Reviews ({reviewCount})
           </h2>
@@ -415,7 +452,7 @@ export default async function ContractorProfilePage({
                 return (
                   <div key={review.id} className="rounded-lg bg-white p-4 shadow-sm">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#E8590C' }}>
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#D85A30' }}>
                         {initials(reviewerName)}
                       </div>
                       <div className="flex-1">

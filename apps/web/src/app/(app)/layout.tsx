@@ -11,13 +11,9 @@ export default async function AppGroupLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { data: profile } = user
-    ? await supabase.from('users').select('name').eq('id', user.id).maybeSingle()
-    : { data: null as { name?: string } | null }
-
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <AppTopHeader userId={user?.id ?? null} profileName={profile?.name} />
+    <div className="min-h-screen bg-[#F2EDE8]">
+      <AppTopHeader userId={user?.id ?? null} />
       <div>{children}</div>
     </div>
   )

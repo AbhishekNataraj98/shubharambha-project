@@ -37,6 +37,7 @@ type ReportsTabProps = {
     professionalRole?: 'worker' | 'contractor' | null
     onPressProfessional?: () => void
     onPressProjectImages?: () => void
+    onPressProjectOverview?: () => void
     contractorAssigned?: boolean
     hideStageTracker?: boolean
     showReportsTab?: boolean
@@ -205,7 +206,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
     if (status === 'paid') return { bg: '#DCFCE7', fg: '#166534', border: '#22C55E', label: 'Paid' }
     if (status === 'partial') return { bg: '#FEF3C7', fg: '#92400E', border: '#F59E0B', label: 'Partial' }
     if (status === 'due') return { bg: '#FFEDD5', fg: '#9A3412', border: '#F97316', label: 'Due now' }
-    return { bg: '#F3F4F6', fg: '#4B5563', border: '#9CA3AF', label: 'Upcoming' }
+    return { bg: '#F2EDE8', fg: '#4B5563', border: '#9CA3AF', label: 'Upcoming' }
   }
 
   const summaryCards = [
@@ -214,7 +215,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
       title: 'Total Contract',
       value: inr.format(report?.overview?.totalContractAmount ?? 0),
       subtitle: 'Contract value',
-      bg: '#F5F5F4',
+      bg: '#EDE8E3',
       valueColor: '#111827',
     },
     {
@@ -230,8 +231,8 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
       title: 'Actual Spent',
       value: inr.format(report?.overview?.totalActualSpent ?? 0),
       subtitle: 'Actually paid',
-      bg: '#FFF4EE',
-      valueColor: '#E8590C',
+      bg: '#FBF0EB',
+      valueColor: '#D85A30',
     },
     {
       key: 'variance',
@@ -263,6 +264,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
         professionalRole={listHeaderProps.professionalRole}
         onPressProfessional={listHeaderProps.onPressProfessional}
       onPressProjectImages={listHeaderProps.onPressProjectImages}
+        onPressProjectOverview={listHeaderProps.onPressProjectOverview}
         contractorAssigned={listHeaderProps.contractorAssigned}
         hideStageTracker={listHeaderProps.hideStageTracker}
         showReportsTab={listHeaderProps.showReportsTab}
@@ -272,10 +274,10 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor="#E8590C" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor="#D85A30" />}
       >
         {loading ? (
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         ) : !report?.hasFinancialSetup ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyEmoji}>📈</Text>
@@ -318,7 +320,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
               <Text style={styles.sectionHeading}>Estimated vs Actual Spending</Text>
               <View style={styles.legendRow}>
                 <View style={styles.legendItem}>
-                  <View style={[styles.legendSquare, { backgroundColor: '#E8590C' }]} />
+                  <View style={[styles.legendSquare, { backgroundColor: '#D85A30' }]} />
                   <Text style={styles.legendText}>Estimated</Text>
                 </View>
                 <View style={styles.legendItem}>
@@ -334,7 +336,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
                     <View key={row.label}>
                       <Text style={styles.chartLabel} numberOfLines={1}>{row.label}</Text>
                       <View style={styles.chartBarsWrap}>
-                        <View style={[styles.chartBar, { width: estimatedWidth, backgroundColor: '#E8590C' }]} />
+                        <View style={[styles.chartBar, { width: estimatedWidth, backgroundColor: '#D85A30' }]} />
                         <View style={[styles.chartBar, { width: actualWidth, backgroundColor: '#3B82F6', marginTop: 4 }]} />
                         <Text style={styles.chartAmount}>
                           {inr.format(row.estimated)} / {inr.format(row.actual)}
@@ -456,7 +458,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
                     style={{
                       height: 8,
                       width: `${Math.max(0, Math.min(100, report.timeline.progressPercent))}%`,
-                      backgroundColor: '#E8590C',
+                      backgroundColor: '#D85A30',
                     }}
                   />
                   <View
@@ -468,7 +470,7 @@ export function ReportsTab({ projectId, currentUserRole, activeTab, onTabChange,
                       width: 10,
                       height: 10,
                       borderRadius: 5,
-                      backgroundColor: '#E8590C',
+                      backgroundColor: '#D85A30',
                       borderWidth: 1,
                       borderColor: '#FFFFFF',
                     }}
@@ -529,7 +531,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
   },
   setupButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   overviewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -559,14 +561,14 @@ const styles = StyleSheet.create({
   chartBarsWrap: { marginLeft: 6 },
   chartBar: { height: 7, borderRadius: 999 },
   chartAmount: { marginTop: 4, fontSize: 10, color: '#6B7280' },
-  stageItem: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, borderColor: '#F3F4F6', padding: 8 },
+  stageItem: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, borderColor: '#F2EDE8', padding: 8 },
   stageDot: { width: 8, height: 8, borderRadius: 4 },
   stageLabel: { fontSize: 14, fontWeight: '700', color: '#111827' },
   stageExpected: { marginTop: 2, fontSize: 12, color: '#6B7280' },
   stageActual: { fontSize: 13, color: '#111827', fontWeight: '600' },
   stageBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   stageBadgeText: { fontSize: 10, fontWeight: '700' },
-  categoryItem: { borderRadius: 10, borderWidth: 1, borderColor: '#F3F4F6', padding: 8 },
+  categoryItem: { borderRadius: 10, borderWidth: 1, borderColor: '#F2EDE8', padding: 8 },
   categoryName: { fontSize: 12, fontWeight: '600', color: '#374151' },
   categoryValue: { marginTop: 2, fontSize: 11, color: '#6B7280' },
   alertTitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
@@ -586,7 +588,7 @@ const styles = StyleSheet.create({
   primaryAction: {
     minHeight: 48,
     borderRadius: 12,
-    backgroundColor: '#E8590C',
+    backgroundColor: '#D85A30',
     alignItems: 'center',
     justifyContent: 'center',
   },

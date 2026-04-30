@@ -244,7 +244,7 @@ export default function ProjectReports({ projectId }: { projectId: string; curre
                 formatter={(value: number, name: string) => [inr.format(Number(value)), name]}
               />
               <Legend />
-              <Line type="monotone" dataKey="estimated" stroke="#E8590C" strokeWidth={2.5} dot={false} name="Estimated" />
+              <Line type="monotone" dataKey="estimated" stroke="#D85A30" strokeWidth={2.5} dot={false} name="Estimated" />
               <Line type="monotone" dataKey="actual" stroke="#3B82F6" strokeDasharray="6 3" strokeWidth={2} dot name="Actual" />
             </LineChart>
           </ResponsiveContainer>
@@ -279,7 +279,7 @@ export default function ProjectReports({ projectId }: { projectId: string; curre
                 <Tooltip formatter={(value: number) => inr.format(Number(value))} />
                 <Legend />
                 <Bar dataKey="budgeted" fill="#93C5FD" name="Budgeted" />
-                <Bar dataKey="actual" fill="#E8590C" name="Actual" />
+                <Bar dataKey="actual" fill="#D85A30" name="Actual" />
               </BarChart>
             </ResponsiveContainer>
           </div>

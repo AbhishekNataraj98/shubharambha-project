@@ -36,7 +36,7 @@ app/
 
 ## Styling
 NativeWind v4 — use className prop like Tailwind
-Orange brand: #E8590C
+Orange brand: #D85A30
 SafeAreaView on every screen
 Min touch target: 48px height on all buttons
 

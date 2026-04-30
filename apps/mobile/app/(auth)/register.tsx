@@ -15,6 +15,7 @@ import { useSessionState } from '@/lib/auth-state'
 import { KeyboardSafeView } from '@/lib/keyboardSafe'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Logo from '@/components/shared/Logo'
 
 const roles = ['customer', 'contractor', 'worker', 'supplier'] as const
 type Role = (typeof roles)[number]
@@ -22,7 +23,7 @@ const contractorSpecialisations = ['Residential', 'Commercial', 'Foundation', 'P
 const workerTrades = ['Mason', 'Plumber', 'Carpenter', 'Electrician', 'Painter'] as const
 type WorkerTrade = (typeof workerTrades)[number]
 
-const BRAND = '#E8590C'
+const BRAND = '#D85A30'
 const BG = '#FFF8F5'
 const FG = '#1A1A1A'
 const MUTED = '#7A6F66'
@@ -89,7 +90,7 @@ export default function RegisterScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color="#E8590C" />
+          <ActivityIndicator color="#D85A30" />
         </View>
       </SafeAreaView>
     )
@@ -178,7 +179,7 @@ export default function RegisterScreen() {
               </Pressable>
               <View style={styles.brandWrap}>
                 <View style={styles.brandIcon}>
-                  <Text style={styles.brandIconText}>S</Text>
+                  <Logo size={16} color="white" />
                 </View>
                 <Text style={styles.brandText}>Shubharambha</Text>
               </View>
@@ -403,7 +404,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandIconText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   brandText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
   stepRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
   stepCol: { alignItems: 'center', flex: 1 },
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     borderTopColor: BRAND,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#F2EDE8',
   },
   detailsTitle: { fontSize: 13, fontWeight: '700', color: FG, marginBottom: 10 },
   fieldLabel: { fontSize: 12, fontWeight: '700', color: FG, marginBottom: 6, marginTop: 2 },

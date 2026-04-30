@@ -266,7 +266,7 @@ export default function ProjectImagesPage() {
           onClick={onUploadClick}
           disabled={uploading}
           className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-xl text-sm font-extrabold text-white shadow-lg ${
-            reachedThreshold ? 'bg-gray-400' : 'bg-[#E8590C] hover:bg-orange-600'
+            reachedThreshold ? 'bg-gray-400' : 'bg-[#D85A30] hover:bg-orange-600'
           }`}
         >
           <ImagePlus className="h-4 w-4" />

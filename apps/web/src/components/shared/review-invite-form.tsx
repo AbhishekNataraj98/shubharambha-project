@@ -133,7 +133,7 @@ export default function ReviewInviteForm({
             setMessage(null)
           }}
           className="mt-2 rounded-md border px-3 py-1.5 text-xs font-semibold"
-          style={{ borderColor: '#E8590C', color: '#E8590C' }}
+          style={{ borderColor: '#D85A30', color: '#D85A30' }}
         >
           Edit existing review
         </button>
@@ -158,7 +158,7 @@ export default function ReviewInviteForm({
                   onClick={() => setScores((prev) => ({ ...prev, [q.key]: star }))}
                   className="text-lg"
                   style={{
-                    color: star <= scores[q.key] ? '#E8590C' : '#D1D5DB',
+                    color: star <= scores[q.key] ? '#D85A30' : '#D1D5DB',
                     opacity: hasReviewLocked && !isEditing ? 0.6 : 1,
                   }}
                 >
@@ -186,7 +186,7 @@ export default function ReviewInviteForm({
         onClick={() => void submit()}
         disabled={submitting || (hasReviewLocked && !isEditing)}
         className="mt-3 rounded-md px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-        style={{ backgroundColor: '#E8590C' }}
+        style={{ backgroundColor: '#D85A30' }}
       >
         {submitting ? 'Submitting...' : hasReviewLocked ? (isEditing ? 'Update review' : 'Review submitted') : 'Submit review'}
       </button>

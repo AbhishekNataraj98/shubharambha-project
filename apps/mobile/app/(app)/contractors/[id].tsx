@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -42,6 +42,7 @@ type ContractorApiResponse = {
   id: string
   role: 'contractor' | 'worker'
   name: string
+  profile_photo_url: string | null
   city: string | null
   phone_number: string | null
   bio: string | null
@@ -51,6 +52,7 @@ type ContractorApiResponse = {
   service_cities: string[]
   avg_rating: number
   review_count: number
+  profile_views: number
   projects_completed: number
   projects_ongoing: number
   completed_projects: CompletedProject[]
@@ -69,10 +71,15 @@ type ContractorApiResponse = {
     reviewer_id: string
   } | null
   reviews: ReviewRow[]
+  professional_images: Array<{
+    id: string
+    image_url: string
+    created_at: string
+  }>
 }
 
-const BRAND = '#E8590C'
-/** Cream-orange band—much lighter than stack header (#E8590C) for clear separation */
+const BRAND = '#D85A30'
+/** Cream-orange band—much lighter than stack header (#D85A30) for clear separation */
 const HERO_BG = '#FFFCF8'
 const HERO_TOP_SHIMMER = '#FFF3E8'
 const HERO_BOTTOM_RULE = '#FFEAD8'
@@ -119,6 +126,9 @@ export default function ContractorProfileScreen() {
   const [isEditingReview, setIsEditingReview] = useState(false)
   const [hasReviewLocked, setHasReviewLocked] = useState(false)
   const [showInviteLockedModal, setShowInviteLockedModal] = useState(false)
+  const [activeGalleryImageUri, setActiveGalleryImageUri] = useState<string | null>(null)
+  const [reviewsY, setReviewsY] = useState(0)
+  const scrollRef = useRef<ScrollView>(null)
 
   const showInviteBar = profile?.role === 'customer'
   const contractorId = Array.isArray(id) ? id[0] : id
@@ -294,7 +304,7 @@ export default function ContractorProfileScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -307,7 +317,7 @@ export default function ContractorProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -317,7 +327,7 @@ export default function ContractorProfileScreen() {
 
   if (!data) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top']}>
         <View style={{ padding: 16 }}>
           <Text>Contractor not found</Text>
         </View>
@@ -325,10 +335,13 @@ export default function ContractorProfileScreen() {
     )
   }
 
-  const activeCitiesCount = new Set((data.ongoing_projects ?? []).map((project) => (project.city ?? '').trim()).filter(Boolean)).size
+  const scrollToReviews = () => {
+    if (!reviewsY) return
+    scrollRef.current?.scrollTo({ y: Math.max(reviewsY - 24, 0), animated: true })
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAFA' }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['bottom']}>
       <Stack.Screen
         options={{
           headerBackVisible: false,
@@ -355,6 +368,7 @@ export default function ContractorProfileScreen() {
       />
       <KeyboardSafeView iosHeaderOffset={44}>
       <ScrollView
+        ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: showInviteBar ? 120 : 32 }}
       >
@@ -381,9 +395,14 @@ export default function ContractorProfileScreen() {
                 backgroundColor: '#FFFFFF',
                 alignItems: 'center',
                 justifyContent: 'center',
+                overflow: 'hidden',
               }}
             >
-              <Text style={{ fontSize: 28, fontWeight: '800', color: BRAND }}>{getInitials(data.name)}</Text>
+              {data.profile_photo_url ? (
+                <Image source={{ uri: data.profile_photo_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <Text style={{ fontSize: 28, fontWeight: '800', color: BRAND }}>{getInitials(data.name)}</Text>
+              )}
             </View>
             <View style={{ flex: 1, paddingBottom: 4 }}>
               <Text style={{ fontSize: 22, fontWeight: '800', color: '#111827' }}>{data.name}</Text>
@@ -415,17 +434,38 @@ export default function ContractorProfileScreen() {
           ) : null}
 
           {data.bio ? (
-            <View style={{ marginBottom: 20, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 16, borderWidth: 1, borderColor: '#F3F4F6' }}>
+            <View style={{ marginBottom: 20, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 16, borderWidth: 1, borderColor: '#F2EDE8' }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 8 }}>About</Text>
               <Text style={{ fontSize: 14, color: '#6B7280', lineHeight: 20 }}>{data.bio}</Text>
             </View>
           ) : null}
 
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
-            <StatCard label="Completed Projects" value={String(data.projects_completed)} />
-            <StatCard label="Ongoing" value={String(data.projects_ongoing ?? 0)} />
-            <StatCard label="Rating" value={data.avg_rating.toFixed(1)} />
-            <StatCard label="Cities" value={String(activeCitiesCount)} />
+            <StatCard label="Rating" value={data.avg_rating.toFixed(1)} onPress={scrollToReviews} />
+            <StatCard label="Completed" value={String(data.projects_completed)} />
+            <StatCard label="Profile views" value={String(data.profile_views ?? 0)} />
+          </View>
+
+          <View style={{ marginBottom: 20, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>PROFILE IMAGES</Text>
+              <Text style={{ fontSize: 11, color: '#9CA3AF' }}>{`${data.professional_images.length}/6`}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {data.professional_images.map((item) => (
+                <View
+                  key={item.id}
+                  style={{ width: '31%', aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: '#FFF7ED' }}
+                >
+                  <TouchableOpacity onPress={() => setActiveGalleryImageUri(item.image_url)} activeOpacity={0.9}>
+                    <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {data.professional_images.length === 0 ? (
+                <Text style={{ color: '#6B7280', fontSize: 13 }}>No profile images yet.</Text>
+              ) : null}
+            </View>
           </View>
 
           <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Projects</Text>
@@ -435,29 +475,35 @@ export default function ContractorProfileScreen() {
             onPressProject={(project) => router.push({ pathname: '/projects/[id]/images', params: { id: project.id } })}
           />
 
-          <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Reviews ({data.review_count})</Text>
-          {data.reviews.length === 0 ? (
-            <Text style={{ color: '#6B7280' }}>No reviews yet</Text>
-          ) : (
-            data.reviews.map((r) => (
-              <View key={r.id} style={{ marginBottom: 12, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F3F4F6' }}>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>{getInitials(r.reviewer_name)}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontWeight: '700', color: '#111827' }}>{r.reviewer_name}</Text>
-                    <Text style={{ fontSize: 12, color: '#B45309', marginTop: 2 }}>{starText(Number(r.rating))}</Text>
-                    <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>{relativeMonths(r.created_at)}</Text>
-                    {r.comment ? <Text style={{ marginTop: 8, fontSize: 14, color: '#4B5563' }}>{r.comment}</Text> : null}
+          <View
+            onLayout={(e) => {
+              setReviewsY(e.nativeEvent.layout.y)
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 12 }}>Reviews ({data.review_count})</Text>
+            {data.reviews.length === 0 ? (
+              <Text style={{ color: '#6B7280' }}>No reviews yet</Text>
+            ) : (
+              data.reviews.map((r) => (
+                <View key={r.id} style={{ marginBottom: 12, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>{getInitials(r.reviewer_name)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '700', color: '#111827' }}>{r.reviewer_name}</Text>
+                      <Text style={{ fontSize: 12, color: '#B45309', marginTop: 2 }}>{starText(Number(r.rating))}</Text>
+                      <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>{relativeMonths(r.created_at)}</Text>
+                      {r.comment ? <Text style={{ marginTop: 8, fontSize: 14, color: '#4B5563' }}>{r.comment}</Text> : null}
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))
-          )}
+              ))
+            )}
+          </View>
 
           {profile?.role === 'customer' && reviewProjectId ? (
-            <View style={{ marginTop: 20, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F3F4F6' }}>
+            <View style={{ marginTop: 20, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}>
               <Text style={{ fontSize: 14, fontWeight: '800', color: '#111827' }}>Rate this professional</Text>
               {reviewLocked ? (
                 <Text style={{ marginTop: 6, fontSize: 12, color: '#6B7280' }}>
@@ -635,7 +681,7 @@ export default function ContractorProfileScreen() {
                   style={{
                     minHeight: 46,
                     borderRadius: 12,
-                    backgroundColor: '#E8590C',
+                    backgroundColor: '#D85A30',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -647,6 +693,29 @@ export default function ContractorProfileScreen() {
           </View>
         </Modal>
       ) : null}
+      <Modal
+        visible={Boolean(activeGalleryImageUri)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActiveGalleryImageUri(null)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onPress={() => setActiveGalleryImageUri(null)}
+        >
+          {activeGalleryImageUri ? (
+            <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420 }}>
+              <Image source={{ uri: activeGalleryImageUri }} style={{ width: '100%', height: 460, borderRadius: 16 }} resizeMode="contain" />
+              <TouchableOpacity
+                onPress={() => setActiveGalleryImageUri(null)}
+                style={{ position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 18, lineHeight: 20 }}>×</Text>
+              </TouchableOpacity>
+            </Pressable>
+          ) : null}
+        </Pressable>
+      </Modal>
       </KeyboardSafeView>
     </SafeAreaView>
   )
@@ -672,7 +741,7 @@ function ScoreRow({
       <View style={{ flexDirection: 'row', gap: 4 }}>
         {[1, 2, 3, 4, 5].map((n) => (
           <Pressable key={n} onPress={() => onChange(n)} disabled={disabled}>
-            <Text style={{ fontSize: 18, color: n <= value ? '#E8590C' : '#D1D5DB', opacity: disabled ? 0.6 : 1 }}>★</Text>
+            <Text style={{ fontSize: 18, color: n <= value ? '#D85A30' : '#D1D5DB', opacity: disabled ? 0.6 : 1 }}>★</Text>
           </Pressable>
         ))}
       </View>
@@ -680,12 +749,18 @@ function ScoreRow({
   )
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ flex: 1, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#F3F4F6' }}>
+function StatCard({ label, value, onPress }: { label: string; value: string; onPress?: () => void }) {
+  const content = (
+    <View style={{ flex: 1, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#F2EDE8' }}>
       <Text style={{ fontSize: 20, fontWeight: '800', color: BRAND }}>{value}</Text>
       <Text style={{ marginTop: 6, fontSize: 11, fontWeight: '600', color: '#6B7280', textAlign: 'center' }}>{label}</Text>
     </View>
+  )
+  if (!onPress) return content
+  return (
+    <TouchableOpacity style={{ flex: 1 }} onPress={onPress}>
+      {content}
+    </TouchableOpacity>
   )
 }
 
@@ -739,7 +814,7 @@ function ProjectList({
               backgroundColor: '#FFFFFF',
               overflow: 'hidden',
               borderWidth: 1,
-              borderColor: '#F3F4F6',
+              borderColor: '#F2EDE8',
               shadowColor: '#000',
               shadowOpacity: 0.08,
               shadowRadius: 8,
@@ -777,7 +852,7 @@ function ProjectList({
                 </View>
               </View>
             ) : (
-              <View style={{ height: 132, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ height: 132, backgroundColor: '#F2EDE8', alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ fontSize: 30 }}>🏗️</Text>
               </View>
             )}
@@ -799,7 +874,7 @@ function ProjectList({
                 width: index === activeIndex ? 16 : 6,
                 height: 6,
                 borderRadius: 999,
-                backgroundColor: index === activeIndex ? '#E8590C' : '#D1D5DB',
+                backgroundColor: index === activeIndex ? '#D85A30' : '#D1D5DB',
               }}
             />
           ))}

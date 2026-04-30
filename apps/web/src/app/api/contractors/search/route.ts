@@ -15,11 +15,6 @@ function pickSpecialisations(profile: Record<string, unknown>) {
   return Array.isArray(value) ? value.map(String) : []
 }
 
-function pickServiceCities(profile: Record<string, unknown>) {
-  const value = (profile.service_cities ?? profile.service_locations ?? []) as unknown
-  return Array.isArray(value) ? value.map(String) : []
-}
-
 export async function GET(request: Request) {
   const supabase = await createClient()
   const {
@@ -59,7 +54,7 @@ export async function GET(request: Request) {
   const { data: contractors, error: contractorError } = isContractorMode
     ? await admin
         .from('users')
-        .select('id,name,city,contractor_profiles(*)')
+        .select('id,name,city,profile_photo_url,contractor_profiles(*)')
         .eq('role', 'contractor')
     : { data: [], error: null as { message: string } | null }
 
@@ -72,9 +67,8 @@ export async function GET(request: Request) {
       ? entry.contractor_profiles[0]
       : entry.contractor_profiles
     const profileRecord = (profile ?? {}) as Record<string, unknown>
-    const serviceCities = pickServiceCities(profileRecord).map((item) => item.toLowerCase())
     const userCity = (entry.city ?? '').toLowerCase()
-    const cityMatch = userCity.includes(city) || serviceCities.some((item) => item.includes(city))
+    const cityMatch = userCity.includes(city)
     if (!cityMatch) return false
     if (!selectedSpecialisation) return true
     const specialisations = pickSpecialisations(profileRecord).map((item) => item.toLowerCase())
@@ -84,7 +78,7 @@ export async function GET(request: Request) {
   const { data: workers, error: workerError } = workerTradeFilter
     ? await admin
         .from('users')
-        .select('id,name,city,worker_profiles(*)')
+        .select('id,name,city,profile_photo_url,worker_profiles(*)')
         .eq('role', 'worker')
     : { data: [], error: null as { message: string } | null }
 
@@ -106,12 +100,25 @@ export async function GET(request: Request) {
       Boolean(workerTradeFilter) &&
       (trade === workerTradeFilter || tagsLower.includes(workerTradeFilter))
     if (!tradeMatches) return false
-    const serviceCities = pickServiceCities(profileRecord).map((item) => item.toLowerCase())
     const userCity = (entry.city ?? '').toLowerCase()
-    return userCity.includes(city) || serviceCities.some((item) => item.includes(city))
+    return userCity.includes(city)
   })
 
   const allProfileIds = [...contractorUsers.map((entry) => entry.id), ...workerUsers.map((entry) => entry.id)]
+  const { data: professionalImageRows } = allProfileIds.length
+    ? await (admin as any)
+        .from('professional_images')
+        .select('professional_id,image_url,created_at')
+        .in('professional_id', allProfileIds)
+        .order('created_at', { ascending: true })
+    : { data: [] as Array<{ professional_id: string; image_url: string; created_at: string }> }
+  const imagesByProfessional = new Map<string, string[]>()
+  for (const row of professionalImageRows ?? []) {
+    if (!row.image_url) continue
+    const current = imagesByProfessional.get(row.professional_id) ?? []
+    if (current.length < 3) current.push(row.image_url)
+    imagesByProfessional.set(row.professional_id, current)
+  }
 
   const { data: reviewRows } = allProfileIds.length
     ? await admin.from('reviews').select('reviewee_id,rating').in('reviewee_id', allProfileIds)
@@ -164,6 +171,8 @@ export async function GET(request: Request) {
       id: entry.id,
       name: entry.name,
       city: entry.city,
+      profile_photo_url: (entry as { profile_photo_url?: string | null }).profile_photo_url ?? null,
+      profile_images: imagesByProfessional.get(entry.id) ?? [],
       profile_kind: 'contractor',
       trade: null,
       avg_rating: rating && rating.count > 0 ? Number((rating.total / rating.count).toFixed(1)) : 0,
@@ -188,6 +197,8 @@ export async function GET(request: Request) {
       id: entry.id,
       name: entry.name,
       city: entry.city,
+      profile_photo_url: (entry as { profile_photo_url?: string | null }).profile_photo_url ?? null,
+      profile_images: imagesByProfessional.get(entry.id) ?? [],
       profile_kind: 'worker',
       trade: trade || null,
       avg_rating: rating && rating.count > 0 ? Number((rating.total / rating.count).toFixed(1)) : 0,

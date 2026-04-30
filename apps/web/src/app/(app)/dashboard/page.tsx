@@ -228,13 +228,13 @@ export default async function DashboardPage() {
   const pendingCustomerNameById = new Map((pendingCustomers ?? []).map((entry) => [entry.id, entry.name]))
 
   return (
-    <div className="min-h-screen pb-24" style={{ backgroundColor: '#F5F4EF' }}>
+    <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2EDE8' }}>
       <div className="mx-auto w-full max-w-md px-4 py-6">
         <section className="mb-4 rounded-[20px] bg-white p-5 shadow-sm">
           <h1 className="mb-2 text-[20px] leading-7 font-bold text-[#1C1917]">
             {getGreeting()}, {profile.name.split(' ')[0]} 👋
           </h1>
-          <div className="inline-flex rounded-full bg-[#FFF4EE] px-3 py-1 text-[13px] font-semibold capitalize text-[#E8590C]">
+          <div className="inline-flex rounded-full bg-[#FBF0EB] px-3 py-1 text-[13px] font-semibold capitalize text-[#D85A30]">
             {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
           </div>
         </section>
@@ -242,8 +242,8 @@ export default async function DashboardPage() {
         <section className="mb-5 grid grid-cols-2 gap-3">
           <div className="relative overflow-hidden rounded-[18px] bg-white p-4 shadow-sm">
             <p className="mb-2 text-[12px] font-medium text-[#78716C]">Active Projects</p>
-            <p className="text-[32px] leading-8 font-extrabold text-[#E8590C]">{activeProjectsCount}</p>
-            <div className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#FFF4EE] text-[16px]">
+            <p className="text-[32px] leading-8 font-extrabold text-[#D85A30]">{activeProjectsCount}</p>
+            <div className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#FBF0EB] text-[16px]">
               🏗️
             </div>
           </div>
@@ -266,7 +266,7 @@ export default async function DashboardPage() {
             {isCustomer ? (
               <Link
                 href="/projects/new"
-                className="rounded-full border border-[#FDDCC4] bg-[#FFF4EE] px-3.5 py-1.5 text-[13px] font-bold text-[#E8590C]"
+                className="rounded-full border border-[#F5DDD4] bg-[#FBF0EB] px-3.5 py-1.5 text-[13px] font-bold text-[#D85A30]"
               >
                 + New
               </Link>
@@ -277,7 +277,7 @@ export default async function DashboardPage() {
             <div className="mb-4 space-y-3">
               <h3 className="text-sm font-bold text-[#1C1917]">Pending Invitations</h3>
               {pendingInvitations?.map((invitation) => (
-                <div key={invitation.id} className="rounded-[14px] bg-[#FEF3E2] p-4" style={{ borderLeft: '4px solid #E8590C' }}>
+                <div key={invitation.id} className="rounded-[14px] bg-[#FEF3E2] p-4" style={{ borderLeft: '4px solid #D85A30' }}>
                   <div>
                     <p className="font-semibold text-[#1C1917]">{invitation.name}</p>
                     <p className="mt-0.5 text-xs text-[#7A6F66]">{invitation.city}</p>
@@ -340,8 +340,8 @@ export default async function DashboardPage() {
 
                     <p className="mb-3 text-[13px] text-[#78716C]">📍 {project.city}</p>
 
-                    <div className="mb-2.5 h-[5px] overflow-hidden rounded bg-[#F5F5F4]">
-                      <div className="h-[5px] rounded bg-[#E8590C]" style={{ width: `${progress}%` }} />
+                    <div className="mb-2.5 h-[5px] overflow-hidden rounded bg-[#EDE8E3]">
+                      <div className="h-[5px] rounded bg-[#D85A30]" style={{ width: `${progress}%` }} />
                     </div>
 
                     <div className="flex items-center justify-between">
