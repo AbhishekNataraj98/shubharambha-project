@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import ContractorProfileBackButton from '@/components/shared/contractor-profile-back-button'
+import ConceptBReviewCards from '@/components/profile/concept-b-review-cards'
+import { formatPhoneIndian, formatReviewsSectionCount } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import InviteContractorBar from '@/components/shared/invite-contractor-bar'
@@ -16,21 +18,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
-}
-
-function relativeMonths(dateValue: string) {
-  const now = Date.now()
-  const then = new Date(dateValue).getTime()
-  const days = Math.max(0, Math.floor((now - then) / (1000 * 60 * 60 * 24)))
-  const months = Math.max(1, Math.floor(days / 30))
-  return `${months} month${months === 1 ? '' : 's'} ago`
-}
-
-function starText(avg: number) {
-  const rounded = Math.round(avg)
-  const filled = '★'.repeat(Math.max(0, Math.min(5, rounded)))
-  const empty = '☆'.repeat(5 - Math.max(0, Math.min(5, rounded)))
-  return `${filled}${empty}`
 }
 
 export default async function ContractorProfilePage({
@@ -63,7 +50,7 @@ export default async function ContractorProfilePage({
 
   const { data: contractor } = await admin
     .from('users')
-    .select('id,name,city,bio,phone_number,role,profile_photo_url,contractor_profiles(*),worker_profiles(*)')
+    .select('id,name,city,pincode,bio,phone_number,role,profile_photo_url,contractor_profiles(*),worker_profiles(*)')
     .eq('id', id)
     .maybeSingle()
 
@@ -160,9 +147,6 @@ export default async function ContractorProfilePage({
     }
   })
   const allPortfolioProjects = [...ongoingPortfolioProjects, ...portfolioProjects]
-  const activeCitiesCount = new Set(
-    ongoingPortfolioProjects.map((project) => (project.city ?? '').trim()).filter(Boolean)
-  ).size
   const { count: profileViewsCount } = await (admin as any)
     .from('professional_profile_views')
     .select('id', { count: 'exact', head: true })
@@ -189,12 +173,6 @@ export default async function ContractorProfilePage({
     ? await admin.from('users').select('id,name').in('id', reviewerIds)
     : { data: [] as Array<{ id: string; name: string }> }
   const reviewerMap = new Map((reviewerUsers ?? []).map((entry) => [entry.id, entry.name]))
-
-  const reviewedProjectIds = Array.from(new Set((reviews ?? []).map((review) => review.project_id)))
-  const { data: reviewedProjects } = reviewedProjectIds.length
-    ? await admin.from('projects').select('id,current_stage').in('id', reviewedProjectIds)
-    : { data: [] as Array<{ id: string; current_stage: string }> }
-  const reviewedProjectMap = new Map((reviewedProjects ?? []).map((project) => [project.id, project.current_stage]))
 
   const reviewCount = (reviews ?? []).length
   const hasExistingReviewForProject =
@@ -275,230 +253,222 @@ export default async function ContractorProfilePage({
         : 'You already have an active project with this worker. Complete it before sending another invite.'
     : null
 
+  const heroCoverUrl = professionalImages[0]?.image_url ?? null
+  const projectsCompletedCount = portfolioProjects.length
+
   return (
     <div className="min-h-screen pb-32" style={{ backgroundColor: '#F2EDE8' }}>
-      {/* Cream-orange hero — lighter than app header, matches mobile profile */}
-      <div
-        className="border-t border-b px-4 py-8"
-        style={{
-          backgroundColor: '#FFFCF8',
-          borderTopColor: '#FFF3E8',
-          borderBottomColor: '#FFEAD8',
-        }}
-      >
-        <div className="mx-auto w-full max-w-md">
-          <ContractorProfileBackButton projectId={projectId} fallbackHref={backHref} />
-
-          <div className="flex items-end gap-4">
+      <div className="mx-auto w-full max-w-md">
+        {/* Concept 5-style hero (matches logged-in contractor/worker profile, without Edit) */}
+        <section className="relative h-[140px] overflow-hidden">
+          {heroCoverUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={heroCoverUrl} alt="Portfolio cover" className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
             <div
-              className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full border-2 bg-white text-4xl font-bold"
-              style={{ borderColor: 'rgba(232, 89, 12, 0.35)', color: '#D85A30', overflow: 'hidden' }}
-            >
+              className="absolute inset-0"
+              style={{ background: 'linear-gradient(160deg, #3D2A20, #5C3820, #2C2C2A)' }}
+            />
+          )}
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute left-3 top-3 z-10">
+            <ContractorProfileBackButton projectId={projectId} fallbackHref={backHref} overlay />
+          </div>
+          {averageRating >= 4.5 ? (
+            <div className="absolute right-3 top-3 z-10 rounded-full bg-[#D85A30] px-2.5 py-1 text-[9px] font-bold text-white">
+              ⭐ Top rated
+            </div>
+          ) : projectsCompletedCount >= 5 ? (
+            <div className="absolute right-3 top-3 z-10 rounded-full bg-black/50 px-2.5 py-1 text-[9px] text-white">
+              {`${projectsCompletedCount} projects`}
+            </div>
+          ) : null}
+          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border-2 border-white/50 bg-[#D85A30] text-base font-bold text-white">
               {contractor.profile_photo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={contractor.profile_photo_url} alt={contractor.name} className="h-full w-full object-cover" />
+                <img src={contractor.profile_photo_url} alt="" className="h-full w-full object-cover" />
               ) : (
                 initials(contractor.name)
               )}
             </div>
-            <div className="pb-2">
-              <h1 className="text-2xl font-bold text-gray-900">{contractor.name}</h1>
-              <p className="mt-1 text-sm font-medium text-stone-600">
-                {contractor.city} · {yearsExperience} years
-              </p>
-              <p className="mt-1 text-sm font-bold" style={{ color: '#D85A30' }}>
-                {contractor.role === 'contractor' ? 'Contractor' : trade || 'Worker'}
-              </p>
-              <p className="mt-1 text-sm font-medium text-gray-600">
-                {contractor.phone_number ?? 'Phone not available'}
-              </p>
-              <p className="mt-1 flex items-center gap-1 text-sm font-bold text-gray-900">
-                {starText(averageRating)} {averageRating.toFixed(1)} ({reviewCount})
-              </p>
+            <div>
+              <p className="text-base font-extrabold leading-tight text-white">{contractor.name}</p>
+              <span className="mt-1 inline-block rounded-full bg-[#D85A30] px-2.5 py-0.5 text-[8px] font-bold capitalize text-white">
+                {contractor.role === 'contractor' ? 'contractor' : contractor.role}
+              </span>
             </div>
           </div>
-        </div>
-      </div>
+          <div className="absolute bottom-4 right-3 z-10 rounded-xl bg-black/50 px-2 py-1 text-[9px] font-bold text-[#F59E0B]">{`★ ${averageRating.toFixed(1)}`}</div>
+        </section>
 
-      <div className="mx-auto w-full max-w-md px-4 py-6">
-        {/* Specialisations */}
-        {specialisations.length > 0 && (
-          <section className="mb-6 flex flex-wrap gap-2">
-            {specialisations.map((item) => (
-              <span
-                key={item}
-                className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-                style={{ backgroundColor: '#D85A30' }}
-              >
-                {item}
-              </span>
-            ))}
-          </section>
-        )}
-
-        {/* About Section */}
-        {contractor.bio ? (
-          <section className="mb-6 rounded-lg bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-bold mb-3" style={{ color: '#1A1A1A' }}>
-              About
-            </h2>
-            <p className="text-sm font-medium leading-relaxed" style={{ color: '#7A6F66' }}>
-              {contractor.bio}
-            </p>
-          </section>
-        ) : null}
-
-        {/* Stats Row */}
-        <section className="mb-6 grid grid-cols-2 gap-3">
-          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-              {portfolioProjects.length}
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-              Projects Completed
-            </p>
-          </div>
-          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-              {ongoingPortfolioProjects.length}
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-              Ongoing Projects
-            </p>
-          </div>
-          <a href="#reviews" className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-              {averageRating.toFixed(1)}
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-              Avg Rating
+        <section className="flex items-stretch justify-around border-b border-[#E8DDD4] bg-white px-4 py-2.5">
+          <a href="#reviews" className="text-center">
+            <p className="text-base font-extrabold text-[#D85A30]">{averageRating.toFixed(1)}</p>
+            <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>
+              Rating
             </p>
           </a>
-          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-              {profileViewsCount ?? 0}
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-              Profile Views
+          <div className="my-1 w-px self-stretch bg-[#E8DDD4]" />
+          <div className="text-center">
+            <p className="text-base font-extrabold text-[#D85A30]">{projectsCompletedCount}</p>
+            <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>
+              Done
             </p>
           </div>
-          <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-            <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-              {activeCitiesCount}
+          <div className="my-1 w-px self-stretch bg-[#E8DDD4]" />
+          <div className="text-center">
+            <p className="text-base font-extrabold text-[#D85A30]">{profileViewsCount ?? 0}</p>
+            <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>
+              Views
             </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-              Cities
+          </div>
+          <div className="my-1 w-px self-stretch bg-[#E8DDD4]" />
+          <div className="text-center">
+            <p className="text-base font-extrabold text-[#D85A30]">{`${yearsExperience}y`}</p>
+            <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>
+              Exp
             </p>
           </div>
         </section>
 
-        {/* Projects */}
-        {allPortfolioProjects.length > 0 && (
-          <section className="mb-6">
-            <h2 className="mb-4 text-lg font-bold" style={{ color: '#1A1A1A' }}>
-              Projects
-            </h2>
-            <div className="overflow-x-auto rounded-xl border border-orange-100 bg-[#FFF8F3] p-3 shadow-sm">
-              <div className="flex gap-3 pb-1">
-                {allPortfolioProjects.map((project) => (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}/images`}
-                    className="relative w-[210px] shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
-                  >
-                    <span
-                      className={`absolute top-2 right-2 z-10 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        project.status === 'completed'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}
-                    >
-                      {project.status === 'completed' ? 'Completed' : 'Ongoing'}
-                    </span>
-                    <div className="relative h-32 bg-gray-100">
-                      {project.thumbnail ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={project.thumbnail} alt={project.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-3xl">🏗️</div>
-                      )}
-                      <div className="absolute inset-x-0 bottom-0 bg-black/35 px-2 py-1">
-                        <p className="text-[11px] font-semibold text-white">View Photos →</p>
-                      </div>
-                    </div>
-                    <div className="p-3">
-                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">{project.name}</p>
-                      <p className="mt-1 text-xs text-gray-500">{project.city}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+        <section className="flex flex-col gap-3 border-b border-[#E8DDD4] bg-white px-4 py-4">
+          <p className="text-[15px] font-bold leading-snug text-[#2C2C2A]">{`📍 ${contractor.city ?? '—'} · ${contractor.pincode ?? '—'}`}</p>
+          <p className="text-[15px] font-bold leading-snug text-[#2C2C2A]">{`📞 ${formatPhoneIndian(contractor.phone_number)}`}</p>
+          <p className="text-[15px] font-bold leading-snug text-[#2C2C2A]">{`👷 ${yearsExperience} yrs experience`}</p>
+        </section>
 
-        <ProfessionalImagesManager initialItems={professionalImages} canEdit={false} />
+        <div className="px-4 py-6">
+          {specialisations.length > 0 ? (
+            <section className="mb-6 flex flex-wrap gap-2">
+              {specialisations.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+                  style={{ backgroundColor: '#D85A30' }}
+                >
+                  {item}
+                </span>
+              ))}
+            </section>
+          ) : null}
 
-        {/* Reviews Section */}
-        <section id="reviews">
-          <h2 className="mb-4 text-lg font-bold" style={{ color: '#1A1A1A' }}>
-            Reviews ({reviewCount})
-          </h2>
-          {reviews && reviews.length > 0 ? (
-            <div className="space-y-3">
-              {reviews.map((review) => {
-                const reviewerName = reviewerMap.get(review.reviewer_id) ?? 'Customer'
-                const stage = reviewedProjectMap.get(review.project_id) ?? 'Foundation work'
-                return (
-                  <div key={review.id} className="rounded-lg bg-white p-4 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#D85A30' }}>
-                        {initials(reviewerName)}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold" style={{ color: '#1A1A1A' }}>
-                          {reviewerName}
-                        </p>
-                        <p className="text-xs font-semibold" style={{ color: '#B8860B' }}>
-                          {starText(Number(review.rating))}
-                        </p>
-                        <p className="mt-1 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                          {stage} · {relativeMonths(review.created_at)}
-                        </p>
-                        {review.comment && (
-                          <p className="mt-2 text-sm font-medium leading-relaxed" style={{ color: '#7A6F66' }}>
-                            {review.comment}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="rounded-lg bg-white p-6 text-center shadow-sm">
-              <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
-                No reviews yet
+          {contractor.bio ? (
+            <section className="mb-6 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white p-4">
+              <h2 className="mb-3 text-sm font-bold" style={{ color: '#1A1A1A' }}>
+                About
+              </h2>
+              <p className="text-sm font-medium leading-relaxed" style={{ color: '#7A6F66' }}>
+                {contractor.bio}
               </p>
-            </div>
-          )}
-        </section>
+            </section>
+          ) : null}
 
-        {viewer?.role === 'customer' && projectId ? (
-          <section className="mt-6">
-            <ReviewInviteForm
-              projectId={projectId}
-              revieweeId={contractor.id}
-              hasExistingReview={hasExistingReviewForProject}
-              existingReview={
-                existingReviewForProject
-                  ? { rating: Number(existingReviewForProject.rating), comment: existingReviewForProject.comment }
-                  : null
-              }
-            />
+          {contractor.role === 'worker' && trade ? (
+            <section className="mb-6 flex items-center gap-2 rounded-2xl border border-[#E8DDD4] bg-white px-4 py-3">
+              <span className="text-xs font-semibold text-[#78716C]">Trade:</span>
+              <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-800">{trade}</span>
+            </section>
+          ) : null}
+
+          {allPortfolioProjects.length > 0 ? (
+            <section className="mb-6">
+              <h2 className="mb-4 text-[9px] font-bold tracking-widest" style={{ color: '#A8A29E' }}>
+                PROJECTS
+              </h2>
+              <div className="overflow-x-auto rounded-xl border border-[#FDE8D9] bg-[#FFF8F3] p-3 shadow-sm">
+                <div className="flex gap-3 pb-1">
+                  {allPortfolioProjects.map((project) => (
+                    <Link
+                      key={project.id}
+                      href={`/projects/${project.id}/images`}
+                      className="relative w-[210px] shrink-0 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white shadow-sm"
+                    >
+                      <span
+                        className={`absolute right-2 top-2 z-10 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          project.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {project.status === 'completed' ? 'Completed' : 'Ongoing'}
+                      </span>
+                      <div className="relative h-32 bg-[#F2EDE8]">
+                        {project.thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={project.thumbnail} alt={project.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-3xl">🏗️</div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 bg-black/35 px-2 py-1">
+                          <p className="text-[11px] font-semibold text-white">View Photos →</p>
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <p className="line-clamp-2 text-sm font-semibold text-gray-900">{project.name}</p>
+                        <p className="mt-1 text-xs text-gray-500">{project.city}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="mb-6 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white">
+            <div className="flex items-center justify-between border-b border-[#F2EDE8] px-4 py-3">
+              <p className="text-[9px] font-bold tracking-widest" style={{ color: '#A8A29E' }}>
+                PORTFOLIO
+              </p>
+              <span className="text-[9px] font-bold text-[#D85A30]">{`${professionalImages.length}/6`}</span>
+            </div>
+            <div className="px-3 py-3">
+              <ProfessionalImagesManager
+                initialItems={professionalImages}
+                canEdit={false}
+                embedded
+                neutralTiles
+              />
+            </div>
           </section>
-        ) : null}
+
+          <section
+            id="reviews"
+            className="mb-6 overflow-hidden rounded-2xl border border-[#E8DDD4]"
+            style={{ backgroundColor: '#F2EDE8' }}
+          >
+            <div className="flex items-center justify-between border-b border-[#E8DDD4]/80 px-4 py-3">
+              <p className="text-[11px] font-extrabold tracking-[0.06em]" style={{ color: '#57534E' }}>
+                REVIEWS
+              </p>
+              <span className="text-[11px] font-bold text-[#D85A30]">{formatReviewsSectionCount(reviewCount)}</span>
+            </div>
+            {reviews && reviews.length > 0 ? (
+              <div className="flex flex-col gap-2 px-2.5 pb-3 pt-2">
+                <ConceptBReviewCards reviews={reviews} reviewerNameById={Object.fromEntries(reviewerMap)} />
+              </div>
+            ) : (
+              <p className="px-4 py-4 text-sm" style={{ color: '#78716C' }}>
+                No reviews yet.
+              </p>
+            )}
+          </section>
+
+          {viewer?.role === 'customer' && projectId ? (
+            <section className="mt-2 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white p-4">
+              <ReviewInviteForm
+                projectId={projectId}
+                revieweeId={contractor.id}
+                hasExistingReview={hasExistingReviewForProject}
+                existingReview={
+                  existingReviewForProject
+                    ? { rating: Number(existingReviewForProject.rating), comment: existingReviewForProject.comment }
+                    : null
+                }
+              />
+            </section>
+          ) : null}
+        </div>
       </div>
 
       {showInviteBar ? (

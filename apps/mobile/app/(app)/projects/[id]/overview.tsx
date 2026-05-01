@@ -256,7 +256,7 @@ export default function ProjectOverviewScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F7F5' }} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F7F5' }} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 28 }}>
         <Text style={{ fontSize: 24, fontWeight: '900', color: '#111827' }}>Project Overview</Text>
 

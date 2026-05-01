@@ -88,7 +88,7 @@ export default function RegisterScreen() {
 
   if (authLoading || waitingForSession) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-white" edges={['top', 'left', 'right']}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#D85A30" />
         </View>
@@ -157,7 +157,7 @@ export default function RegisterScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={styles.safe} edges={[]}>
         <KeyboardSafeView includeTopSafeArea iosHeaderOffset={8}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.topHeaderContainer}>

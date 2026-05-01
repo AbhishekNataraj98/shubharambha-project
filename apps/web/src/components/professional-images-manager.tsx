@@ -13,9 +13,21 @@ const MAX_IMAGES = 6
 export default function ProfessionalImagesManager({
   initialItems,
   canEdit,
+  embedded,
+  neutralTiles,
+  galleryHeading,
+  noOuterChrome,
 }: {
   initialItems: ProfessionalImage[]
   canEdit: boolean
+  /** When true, render only the grid + modal (parent supplies outer frame/header). */
+  embedded?: boolean
+  /** Softer borders/fills for public profile cards */
+  neutralTiles?: boolean
+  /** Replaces default "PROFILE IMAGES" label */
+  galleryHeading?: string
+  /** Omit default section frame — parent supplies card border */
+  noOuterChrome?: boolean
 }) {
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [items, setItems] = useState<ProfessionalImage[]>(initialItems)
@@ -76,47 +88,56 @@ export default function ProfessionalImagesManager({
     }
   }
 
-  return (
-    <section className="mb-6 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs font-bold tracking-wide" style={{ color: '#999' }}>
-          PROFILE IMAGES
-        </p>
-        {canEdit ? (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => void onPickImage(event.target.files?.[0] ?? null)}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (!canAdd) {
-                  window.alert('6 images limit reached delete existing to upload new')
-                  return
-                }
-                fileRef.current?.click()
-              }}
-              disabled={busy}
-              className="rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-              style={{
-                border: '1px solid #FED7AA',
-                backgroundColor: '#FFF7ED',
-                color: '#C2410C',
-              }}
-            >
-              + Add image
-            </button>
-          </>
-        ) : null}
-      </div>
+  const tileWrap =
+    neutralTiles
+      ? 'relative aspect-square overflow-hidden rounded-[10px] border border-[#E8DDD4] bg-[#F2EDE8]'
+      : 'relative aspect-square overflow-hidden rounded-xl border border-orange-100 bg-orange-50'
+
+  const inner = (
+    <>
+      {!embedded ? (
+        <div
+          className={`mb-3 flex items-center justify-between ${noOuterChrome ? 'border-b border-[#F2EDE8] pb-3' : ''}`}
+        >
+          <p className="text-[9px] font-bold tracking-[0.06em]" style={{ color: '#A8A29E' }}>
+            {galleryHeading ?? 'PROFILE IMAGES'}
+          </p>
+          {canEdit ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => void onPickImage(event.target.files?.[0] ?? null)}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canAdd) {
+                    window.alert('6 images limit reached delete existing to upload new')
+                    return
+                  }
+                  fileRef.current?.click()
+                }}
+                disabled={busy}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                style={{
+                  border: '1px solid #FED7AA',
+                  backgroundColor: '#FFF7ED',
+                  color: '#C2410C',
+                }}
+              >
+                + Add image
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-3 gap-2">
         {items.map((item) => (
-          <div key={item.id} className="relative aspect-square overflow-hidden rounded-xl border border-orange-100 bg-orange-50">
+          <div key={item.id} className={tileWrap}>
             <button
               type="button"
               onClick={() => setActiveImageUrl(item.image_url)}
@@ -139,7 +160,7 @@ export default function ProfessionalImagesManager({
             ) : null}
           </div>
         ))}
-        {canEdit
+        {canEdit && !embedded
           ? Array.from({ length: Math.max(0, MAX_IMAGES - items.length) }).map((_, index) => (
               <div
                 key={`slot-${index}`}
@@ -151,7 +172,7 @@ export default function ProfessionalImagesManager({
           : null}
       </div>
       {!canEdit && items.length === 0 ? (
-        <p className="mt-2 text-sm" style={{ color: '#7A6F66' }}>
+        <p className={`text-sm ${embedded ? '' : 'mt-2'}`} style={{ color: '#7A6F66' }}>
           No profile images yet.
         </p>
       ) : null}
@@ -159,6 +180,10 @@ export default function ProfessionalImagesManager({
       {canEdit ? (
         <p className="mt-3 text-[11px]" style={{ color: '#9CA3AF' }}>
           {`${items.length}/${MAX_IMAGES} images used`}
+        </p>
+      ) : embedded ? (
+        <p className="mt-2 text-[9px]" style={{ color: '#78716C' }}>
+          {`${items.length}/${MAX_IMAGES} images`}
         </p>
       ) : null}
       {message ? (
@@ -185,6 +210,18 @@ export default function ProfessionalImagesManager({
           </div>
         </div>
       ) : null}
+    </>
+  )
+
+  if (embedded) return inner
+
+  if (noOuterChrome) {
+    return <div className="space-y-3">{inner}</div>
+  }
+
+  return (
+    <section className="mb-6 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
+      {inner}
     </section>
   )
 }

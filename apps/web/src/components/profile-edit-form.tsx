@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Props = {
   role: string
@@ -9,11 +9,20 @@ type Props = {
   initialPincode: string
   initialYearsExperience: number
   initialWorkerYearsExperience: number
+  /** Hide centered toggle — use hero Edit/Cancel + panelOpen */
+  hideToggleButton?: boolean
+  panelOpen?: boolean
+  onPanelOpenChange?: (open: boolean) => void
 }
 
 export default function ProfileEditForm(props: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null)
-  const [editing, setEditing] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const prevControlledOpen = useRef<boolean | undefined>(undefined)
+
+  const isControlled = props.panelOpen !== undefined && props.onPanelOpenChange !== undefined
+  const editingVisible = isControlled ? Boolean(props.panelOpen) : internalOpen
+
   const [photoUrl, setPhotoUrl] = useState(props.initialPhotoUrl)
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null)
   const [city, setCity] = useState(props.initialCity)
@@ -36,9 +45,42 @@ export default function ProfileEditForm(props: Props) {
     setMessage(null)
   }
 
+  useEffect(() => {
+    setPhotoUrl(props.initialPhotoUrl)
+    setCity(props.initialCity)
+    setPincode(props.initialPincode)
+    setYearsExperience(
+      String(props.role === 'worker' ? props.initialWorkerYearsExperience : props.initialYearsExperience || '')
+    )
+  }, [
+    props.initialPhotoUrl,
+    props.initialCity,
+    props.initialPincode,
+    props.initialYearsExperience,
+    props.initialWorkerYearsExperience,
+    props.role,
+  ])
+
+  useEffect(() => {
+    if (!isControlled) return
+    const prev = prevControlledOpen.current
+    const cur = Boolean(props.panelOpen)
+    if (prev === true && cur === false) resetDraft()
+    prevControlledOpen.current = cur
+  }, [isControlled, props.panelOpen])
+
+  const setEditingVisible = (next: boolean) => {
+    if (isControlled) {
+      props.onPanelOpenChange!(next)
+    } else {
+      if (!next) resetDraft()
+      setInternalOpen(next)
+    }
+  }
+
   const onToggleEdit = () => {
-    if (editing) resetDraft()
-    setEditing((prev) => !prev)
+    if (!isControlled && editingVisible) resetDraft()
+    setEditingVisible(!editingVisible)
   }
 
   const onSave = async () => {
@@ -90,25 +132,31 @@ export default function ProfileEditForm(props: Props) {
     }
   }
 
+  const showToggle = !props.hideToggleButton
+
+  if (props.hideToggleButton && !editingVisible) return null
+
   return (
-    <section className="mb-6">
-      <div className="mb-3 flex justify-center">
-        <button
-          type="button"
-          onClick={onToggleEdit}
-          className="rounded-full px-3 py-1.5 text-xs font-semibold"
-          style={{
-            borderWidth: 1,
-            borderColor: '#FED7AA',
-            backgroundColor: '#FFF7ED',
-            color: '#C2410C',
-          }}
-        >
-          {editing ? 'Cancel edit' : 'Edit profile'}
-        </button>
-      </div>
-      {editing ? (
-        <div className="rounded-lg bg-white p-4 shadow-sm">
+    <section className={showToggle ? 'mb-6' : 'mx-4 mb-4 mt-3.5'}>
+      {showToggle ? (
+        <div className="mb-3 flex justify-center">
+          <button
+            type="button"
+            onClick={onToggleEdit}
+            className="rounded-full px-3 py-1.5 text-xs font-semibold"
+            style={{
+              borderWidth: 1,
+              borderColor: '#FED7AA',
+              backgroundColor: '#FFF7ED',
+              color: '#C2410C',
+            }}
+          >
+            {editingVisible ? 'Cancel edit' : 'Edit profile'}
+          </button>
+        </div>
+      ) : null}
+      {editingVisible ? (
+        <div className="rounded-2xl border border-[#E8DDD4] bg-white p-4">
           <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
             EDIT PROFILE
           </p>
@@ -129,7 +177,7 @@ export default function ProfileEditForm(props: Props) {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={saving}
-                className="w-full rounded-md px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                className="w-full min-h-[42px] rounded-[10px] px-4 py-2 text-sm font-bold disabled:opacity-60"
                 style={{
                   borderWidth: 1,
                   borderColor: '#FED7AA',
@@ -146,33 +194,31 @@ export default function ProfileEditForm(props: Props) {
               ) : null}
             </div>
             {props.role === 'contractor' || props.role === 'worker' ? (
-              <>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-600">Years experience</label>
-                  <input
-                    value={yearsExperience}
-                    onChange={(event) => setYearsExperience(event.target.value.replace(/[^\d]/g, ''))}
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-                  />
-                </div>
-              </>
+              <div>
+                <label className="mb-1 block text-[11px] font-bold text-gray-500">Years experience</label>
+                <input
+                  value={yearsExperience}
+                  onChange={(event) => setYearsExperience(event.target.value.replace(/[^\d]/g, ''))}
+                  className="min-h-10 w-full rounded-[10px] border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
             ) : null}
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">City</label>
+                <label className="mb-1 block text-[11px] font-bold text-gray-500">City</label>
                 <input
                   value={city}
                   onChange={(event) => setCity(event.target.value)}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  className="min-h-10 w-full rounded-[10px] border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">Pincode</label>
+                <label className="mb-1 block text-[11px] font-bold text-gray-500">Pincode</label>
                 <input
                   value={pincode}
                   onChange={(event) => setPincode(event.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+                  className="min-h-10 w-full rounded-[10px] border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -182,7 +228,8 @@ export default function ProfileEditForm(props: Props) {
               type="button"
               onClick={() => void onSave()}
               disabled={saving || uploading}
-              className="w-full rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              className="mt-3 min-h-[46px] w-full rounded-[10px] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              style={{ backgroundColor: '#D85A30' }}
             >
               {saving || uploading ? 'Saving...' : 'Save profile'}
             </button>
@@ -192,4 +239,3 @@ export default function ProfileEditForm(props: Props) {
     </section>
   )
 }
-

@@ -229,7 +229,7 @@ export default function ProjectImagesScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -242,7 +242,7 @@ export default function ProjectImagesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -251,7 +251,7 @@ export default function ProjectImagesScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF7F3' }} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF7F3' }} edges={['left', 'right']}>
       <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 20, backgroundColor: '#FFFFFF', padding: 16, borderWidth: 1, borderColor: '#FED7AA' }}>
         <Text style={{ fontSize: 22, fontWeight: '800', color: '#111827' }}>Project Images</Text>
         <View style={{ marginTop: 12, alignSelf: 'flex-start', borderRadius: 999, backgroundColor: reachedThreshold ? '#FEE2E2' : '#ECFDF3', paddingHorizontal: 12, paddingVertical: 6 }}>

@@ -135,7 +135,7 @@ export default function AppLayout() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1 bg-white" edges={['top', 'left', 'right']}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#D85A30" />
         </View>

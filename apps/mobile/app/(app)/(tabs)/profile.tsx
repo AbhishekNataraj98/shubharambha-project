@@ -1,18 +1,36 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '@/lib/supabase'
 import { useSessionState } from '@/lib/auth-state'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { formatPhoneIndian } from '@/lib/utils'
+import {
+  formatPhoneIndian,
+  formatReviewsSectionCount,
+  METRIC_CONFIG,
+  parseReviewComment,
+  reviewListingTimeLabel,
+  reviewMetricScore,
+} from '@/lib/utils'
+import { ReviewStarRow } from '@/components/review-star-row'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 import { InvitationActions } from '@/components/InvitationActions'
 import { uploadPhotoToWebApi } from '@/lib/uploadPhoto'
 
 const BRAND = '#D85A30'
-const FG = '#1A1A1A'
-const MUTED = '#7A6F66'
+const BRAND_DARK = '#B8471F'
+const CHARCOAL = '#2C2C2A'
+/** Customer profile hero band — unified dark brown (no charcoal / terracotta wedge) */
+const CUSTOMER_HERO_BROWN = '#4a423c'
+const FG = '#2C2C2A'
+const MUTED = '#78716C'
+const PAGE_BG = '#F2EDE8'
+const CARD_BG = '#FFFFFF'
+const CARD_BORDER = '#E8DDD4'
+const BRAND_LIGHT = '#FBF0EB'
+const BRAND_BORDER = '#F5DDD4'
+const REVIEW_CARD_HEADER_BG = '#4a423c'
 const inputStyle = {
   minHeight: 40,
   borderWidth: 1,
@@ -108,6 +126,7 @@ export default function ProfileTab() {
   const router = useRouter()
   const { section } = useLocalSearchParams<{ section?: string }>()
   const { user, loading: authLoading, refreshProfile } = useSessionState()
+  const reviewListClockMs = useMemo(() => Date.now(), [])
   const paymentChannelSuffixRef = useRef(Math.random().toString(36).slice(2))
   const enquiriesChannelSuffixRef = useRef(Math.random().toString(36).slice(2))
   const notificationsChannelSuffixRef = useRef(Math.random().toString(36).slice(2))
@@ -116,6 +135,8 @@ export default function ProfileTab() {
   const [contractorYearsExperience, setContractorYearsExperience] = useState(0)
   const [workerYearsExperience, setWorkerYearsExperience] = useState(0)
   const [trade, setTrade] = useState<string | null>(null)
+  const [contractorSpecialisations, setContractorSpecialisations] = useState<string[]>([])
+  const [workerSkillTags, setWorkerSkillTags] = useState<string[]>([])
   const [reviewsCount, setReviewsCount] = useState(0)
   const [avgRating, setAvgRating] = useState(0)
   const [projectsCompleted, setProjectsCompleted] = useState(0)
@@ -176,10 +197,14 @@ export default function ProfileTab() {
         ? (rec.specialisations as string[])
         : Array.isArray(rec.specialization)
           ? (rec.specialization as string[])
-          : []
+          : Array.isArray(rec.skill_tags)
+            ? (rec.skill_tags as string[])
+            : []
       setContractorYearsExperience(Number(rec.years_experience ?? 0))
       setWorkerYearsExperience(0)
       setEditYearsExperience(String(Number(rec.years_experience ?? 0)))
+      setContractorSpecialisations(specs)
+      setWorkerSkillTags([])
       const { count } = await (supabase as any)
         .from('professional_profile_views')
         .select('id', { count: 'exact', head: true })
@@ -188,7 +213,11 @@ export default function ProfileTab() {
     } else if (role === 'worker') {
       const { data: wp } = await supabase.from('worker_profiles').select('*').eq('user_id', user.id).maybeSingle()
       const rec = (wp ?? {}) as Record<string, unknown>
-      setTrade(typeof rec.trade === 'string' ? rec.trade : null)
+      setContractorSpecialisations([])
+      const tagSource = Array.isArray(rec.skill_tags) ? (rec.skill_tags as unknown[]) : []
+      const parsedTags = [...new Set(tagSource.map((t) => String(t).trim()).filter(Boolean))]
+      setWorkerSkillTags(parsedTags)
+      setTrade(typeof rec.trade === 'string' ? rec.trade : parsedTags[0] ?? null)
       setWorkerYearsExperience(Number(rec.years_experience ?? 0))
       setContractorYearsExperience(0)
       setEditYearsExperience(String(Number(rec.years_experience ?? 0)))
@@ -199,6 +228,8 @@ export default function ProfileTab() {
       setProfileViews(count ?? 0)
     } else {
       setTrade(null)
+      setContractorSpecialisations([])
+      setWorkerSkillTags([])
       setContractorYearsExperience(0)
       setWorkerYearsExperience(0)
       setEditYearsExperience('')
@@ -332,37 +363,29 @@ export default function ProfileTab() {
       setProfessionalImages([])
     }
 
-    const { data: revs } = await supabase
-      .from('reviews')
-      .select('id,rating,comment,created_at,reviewer_id,project_id')
-      .eq('reviewee_id', user.id)
-      .order('created_at', { ascending: false })
-    const reviewRows = (revs ?? []) as ReviewRow[]
-    const rc = reviewRows.length
-    setReviewsCount(rc)
-    setAvgRating(rc > 0 ? Number((reviewRows.reduce((s, r) => s + Number(r.rating), 0) / rc).toFixed(1)) : 0)
     if (role === 'contractor' || role === 'worker') {
-      const reviewerIds = Array.from(new Set(reviewRows.map((r) => r.reviewer_id)))
-      const projectIds = Array.from(new Set(reviewRows.map((r) => r.project_id)))
-      const { data: reviewerRows } = reviewerIds.length
-        ? await supabase.from('users').select('id,name').in('id', reviewerIds)
-        : { data: [] as Array<{ id: string; name: string }> }
-      const reviewerNameById = new Map((reviewerRows ?? []).map((r) => [r.id, r.name]))
-      const { data: projectRows } = projectIds.length
-        ? await supabase.from('projects').select('id,name').in('id', projectIds)
-        : { data: [] as Array<{ id: string; name: string }> }
-      const projectNameById = new Map((projectRows ?? []).map((p) => [p.id, p.name]))
-      setReviewItems(
-        reviewRows.map((r) => ({
-          id: r.id,
-          rating: Number(r.rating),
-          comment: r.comment,
-          created_at: r.created_at,
-          reviewer_name: reviewerNameById.get(r.reviewer_id) ?? 'Customer',
-          project_name: projectNameById.get(r.project_id) ?? 'Project',
-        }))
-      )
+      try {
+        const payload = await apiGet<{ reviews: ReviewDisplayRow[] }>('/api/profile/my-review-display')
+        const list = Array.isArray(payload.reviews) ? payload.reviews : []
+        setReviewItems(list)
+        const rc = list.length
+        setReviewsCount(rc)
+        setAvgRating(rc > 0 ? Number((list.reduce((s, r) => s + Number(r.rating), 0) / rc).toFixed(1)) : 0)
+      } catch {
+        setReviewItems([])
+        setReviewsCount(0)
+        setAvgRating(0)
+      }
     } else {
+      const { data: revs } = await supabase
+        .from('reviews')
+        .select('id,rating,comment,created_at,reviewer_id,project_id')
+        .eq('reviewee_id', user.id)
+        .order('created_at', { ascending: false })
+      const reviewRows = (revs ?? []) as ReviewRow[]
+      const rc = reviewRows.length
+      setReviewsCount(rc)
+      setAvgRating(rc > 0 ? Number((reviewRows.reduce((s, r) => s + Number(r.rating), 0) / rc).toFixed(1)) : 0)
       setReviewItems([])
     }
 
@@ -666,7 +689,7 @@ export default function ProfileTab() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top', 'left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -678,7 +701,7 @@ export default function ProfileTab() {
 
   if (loading || !row) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['top', 'left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={BRAND} />
         </View>
@@ -695,469 +718,730 @@ export default function ProfileTab() {
   const receivedScrollable = receivedInvitesForDisplay.length > 2
   const sentScrollable = sentInvitesForDisplay.length > 2
 
+  const customerActiveCount = Array.from(sentInviteApproved.values()).filter(Boolean).length
+  const isCustomer = row.role === 'customer'
+  const heroImage = professionalImages.length > 0 ? professionalImages[0]?.image_url : previewPhotoUri
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['bottom']}>
-      <ScrollView ref={scrollRef} nestedScrollEnabled contentContainerStyle={{ paddingBottom: 12 }}>
-        <View style={{ alignItems: 'center', marginTop: 16 }}>
-          <View
-            style={{
-              width: 88,
-              height: 88,
-              borderRadius: 44,
-              borderWidth: 3,
-              borderColor: '#FFFFFF',
-              backgroundColor: BRAND,
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            {previewPhotoUri ? (
-              <Image source={{ uri: previewPhotoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-            ) : (
-              <Text style={{ fontSize: 28, fontWeight: '800', color: '#FFFFFF' }}>
-                {row.name?.trim()?.charAt(0)?.toUpperCase() || 'U'}
-              </Text>
-            )}
-          </View>
-          <TouchableOpacity
-            onPress={onToggleEditProfile}
-            style={{ marginTop: 10, borderRadius: 999, backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA', paddingHorizontal: 12, paddingVertical: 6 }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#C2410C' }}>{editingProfile ? 'Cancel edit' : 'Edit profile'}</Text>
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: PAGE_BG }} edges={[]}>
+      <ScrollView
+        ref={scrollRef}
+        nestedScrollEnabled
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
+      >
+        {isCustomer ? (
+          <>
+            <View style={{ height: 120, position: 'relative' }}>
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: CUSTOMER_HERO_BROWN,
+                }}
+              />
+              <TouchableOpacity
+                onPress={onToggleEditProfile}
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 14,
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  borderWidth: 0.5,
+                  borderColor: 'rgba(255,255,255,0.3)',
+                  borderRadius: 10,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                }}
+              >
+                <Text style={{ fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.9)' }}>{editingProfile ? 'Cancel ✕' : 'Edit ✎'}</Text>
+              </TouchableOpacity>
+              <View style={{ position: 'absolute', left: 0, right: 0, bottom: -36, alignItems: 'center' }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: PAGE_BG, backgroundColor: BRAND, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                  {previewPhotoUri ? (
+                    <Image source={{ uri: previewPhotoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  ) : (
+                    <Text style={{ fontSize: 24, fontWeight: '800', color: '#FFFFFF' }}>{row.name?.trim()?.charAt(0)?.toUpperCase() || 'U'}</Text>
+                  )}
+                </View>
+              </View>
+            </View>
 
-        <View style={{ paddingHorizontal: 16, marginTop: 12, alignItems: 'center' }}>
-          <Text style={{ fontSize: 22, fontWeight: '800', color: FG }}>{row.name}</Text>
-          <View style={{ marginTop: 10, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: BRAND }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF', textTransform: 'capitalize' }}>{row.role}</Text>
-          </View>
-          <Text style={{ marginTop: 12, fontSize: 14, fontWeight: '600', color: MUTED }}>{formatPhoneIndian(row.phone_number)}</Text>
-          <Text style={{ marginTop: 4, fontSize: 12, color: '#999' }}>
-            {row.city ?? '—'} · {row.pincode ?? '—'}
-          </Text>
-        </View>
+            <View style={{ paddingTop: 44, paddingHorizontal: 16, alignItems: 'center' }}>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: CHARCOAL, marginBottom: 6 }}>{row.name}</Text>
+              <View style={{ backgroundColor: BRAND, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF', textTransform: 'capitalize' }}>{row.role}</Text>
+              </View>
+              <Text style={{ marginTop: 12, fontSize: 15, fontWeight: '700', color: CHARCOAL }}>{`📞 ${formatPhoneIndian(row.phone_number)}`}</Text>
+              <Text style={{ marginTop: 8, fontSize: 15, fontWeight: '700', color: CHARCOAL }}>{`📍 ${row.city ?? '—'} · ${row.pincode ?? '—'}`}</Text>
+            </View>
 
-        {showStats ? (
-          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 20 }}>
-            <StatBox label="Rating" value={avgRating.toFixed(1)} />
-            <StatBox label="Completed" value={String(projectsCompleted)} />
-            <StatBox label="Profile views" value={String(profileViews)} />
-          </View>
-        ) : null}
+            <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 16 }}>
+              <View style={{ flex: 1, borderRadius: 14, backgroundColor: CARD_BG, borderWidth: 0.5, borderColor: CARD_BORDER, padding: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: BRAND }}>{sentInvitesForDisplay.length}</Text>
+                <Text style={{ fontSize: 8, color: MUTED, marginTop: 3, textAlign: 'center' }}>Invitations</Text>
+              </View>
+              <View style={{ flex: 1, borderRadius: 14, backgroundColor: CARD_BG, borderWidth: 0.5, borderColor: CARD_BORDER, padding: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: BRAND }}>{customerActiveCount}</Text>
+                <Text style={{ fontSize: 8, color: MUTED, marginTop: 3, textAlign: 'center' }}>Active</Text>
+              </View>
+              <View style={{ flex: 1, borderRadius: 14, backgroundColor: CARD_BG, borderWidth: 0.5, borderColor: CARD_BORDER, padding: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: BRAND }}>{projectsCompleted}</Text>
+                <Text style={{ fontSize: 8, color: MUTED, marginTop: 3, textAlign: 'center' }}>Completed</Text>
+              </View>
+            </View>
 
-        {editingProfile ? (
-          <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>EDIT PROFILE</Text>
-            <TouchableOpacity
-              onPress={() => void pickProfilePhoto()}
-              disabled={uploadingPhoto}
-              style={{ marginTop: 10, minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Text style={{ color: '#C2410C', fontWeight: '700' }}>{uploadingPhoto ? 'Uploading...' : 'Change profile photo'}</Text>
-            </TouchableOpacity>
-            {(row.role === 'contractor' || row.role === 'worker') ? (
-              <>
-                <Text style={{ marginTop: 10, marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Years experience</Text>
-                <TextInput
-                  value={editYearsExperience}
-                  onChangeText={(t) => setEditYearsExperience(t.replace(/[^\d]/g, ''))}
-                  keyboardType="number-pad"
-                  style={inputStyle}
-                />
-              </>
+            {editingProfile ? (
+              <View style={{ marginHorizontal: 16, marginTop: 14, backgroundColor: CARD_BG, borderRadius: 16, borderWidth: 0.5, borderColor: CARD_BORDER, padding: 16 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>EDIT PROFILE</Text>
+                <TouchableOpacity
+                  onPress={() => void pickProfilePhoto()}
+                  disabled={uploadingPhoto}
+                  style={{ marginTop: 10, minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: '#C2410C', fontWeight: '700' }}>{uploadingPhoto ? 'Uploading...' : 'Change profile photo'}</Text>
+                </TouchableOpacity>
+                {(row.role === 'contractor' || row.role === 'worker') ? (
+                  <>
+                    <Text style={{ marginTop: 10, marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Years experience</Text>
+                    <TextInput
+                      value={editYearsExperience}
+                      onChangeText={(t) => setEditYearsExperience(t.replace(/[^\d]/g, ''))}
+                      keyboardType="number-pad"
+                      style={inputStyle}
+                    />
+                  </>
+                ) : null}
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>City</Text>
+                    <TextInput value={editCity} onChangeText={setEditCity} style={inputStyle} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Pincode</Text>
+                    <TextInput
+                      value={editPincode}
+                      onChangeText={(t) => setEditPincode(t.replace(/[^\d]/g, '').slice(0, 6))}
+                      keyboardType="number-pad"
+                      style={inputStyle}
+                    />
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => void saveProfileEdits()}
+                  disabled={savingProfile || uploadingPhoto}
+                  style={{ marginTop: 14, minHeight: 46, borderRadius: 10, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center', opacity: savingProfile || uploadingPhoto ? 0.7 : 1 }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{savingProfile ? 'Saving...' : 'Save profile'}</Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
 
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>City</Text>
-                <TextInput value={editCity} onChangeText={setEditCity} style={inputStyle} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Pincode</Text>
-                <TextInput
-                  value={editPincode}
-                  onChangeText={(t) => setEditPincode(t.replace(/[^\d]/g, '').slice(0, 6))}
-                  keyboardType="number-pad"
-                  style={inputStyle}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => void saveProfileEdits()}
-              disabled={savingProfile || uploadingPhoto}
-              style={{ marginTop: 14, minHeight: 46, borderRadius: 10, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center', opacity: savingProfile || uploadingPhoto ? 0.7 : 1 }}
+            <View
+              onLayout={(e) => {
+                const y = e.nativeEvent.layout.y
+                setInvitationsY((prev) => (prev === 0 ? y : prev))
+              }}
+              style={{ marginHorizontal: 16, marginTop: 14, backgroundColor: CARD_BG, borderRadius: 16, borderWidth: 0.5, borderColor: CARD_BORDER, overflow: 'hidden' }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{savingProfile ? 'Saving...' : 'Save profile'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {row.role === 'contractor' || row.role === 'worker' ? (
-          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-            <Text style={{ color: MUTED }}>
-              {(row.role === 'contractor' ? contractorYearsExperience : workerYearsExperience)} years of experience
-            </Text>
-          </View>
-        ) : null}
-
-        {(row.role === 'contractor' || row.role === 'worker') ? (
-          <View
-            style={{
-              marginHorizontal: 16,
-              marginTop: 12,
-              borderRadius: 16,
-              backgroundColor: '#FFFFFF',
-              padding: 14,
-              borderWidth: 1,
-              borderColor: '#FFEDD5',
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>PROFILE IMAGES</Text>
-              <TouchableOpacity
-                onPress={() => void addProfessionalImage()}
-                disabled={uploadingPhoto}
-                style={{ borderRadius: 999, borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', paddingHorizontal: 10, paddingVertical: 6, opacity: uploadingPhoto ? 0.7 : 1 }}
+              <View style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: PAGE_BG, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#A8A29E', letterSpacing: 0.6 }}>INVITATIONS SENT</Text>
+                {sentInvitesForDisplay.length > 0 ? <Text style={{ fontSize: 9, color: BRAND, fontWeight: '700' }}>{`${sentInvitesForDisplay.length} pending`}</Text> : null}
+              </View>
+              <ScrollView
+                nestedScrollEnabled
+                scrollEnabled={sentScrollable}
+                showsVerticalScrollIndicator={sentScrollable}
+                style={{ height: sentScrollable ? 280 : undefined }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#C2410C' }}>
-                  {uploadingPhoto ? 'Uploading...' : '+ Add image'}
-                </Text>
-              </TouchableOpacity>
+                {sentInvitesForDisplay.map((invite, index) => {
+                    const parsed = parseInviteSubject(invite.subject)
+                    const rec = invite.recipient_id ? recipientMap.get(invite.recipient_id) : undefined
+                    const approvedByMembership = sentInviteApproved.get(invite.id) === true
+                    const inviteRole = sentInviteRole.get(invite.id) ?? (rec?.role === 'worker' ? 'worker' : 'contractor')
+                    const roleLabel = inviteRole === 'worker' ? 'Worker' : 'Contractor'
+                    const waitingLabel = inviteRole === 'worker' ? 'Waiting worker approval' : 'Waiting contractor approval'
+                    const statusLabel =
+                      approvedByMembership || invite.status === 'responded'
+                        ? 'Invitation approved'
+                        : invite.status === 'open'
+                          ? waitingLabel
+                          : 'Declined'
+                    const approved = approvedByMembership || invite.status === 'responded'
+                    const statusColor = approved ? '#166534' : invite.status === 'open' ? '#B45309' : '#B45309'
+                    const statusBg = approved ? '#ECFDF3' : invite.status === 'open' ? '#FFFBEB' : '#FFF7ED'
+                  return (
+                      <View
+                        key={invite.id}
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderBottomWidth: index === sentInvitesForDisplay.length - 1 ? 0 : 0.5,
+                          borderBottomColor: PAGE_BG,
+                        }}
+                      >
+                        <View
+                          style={{
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: '#F1F5F9',
+                            backgroundColor: '#FFFFFF',
+                            borderLeftWidth: 4,
+                            borderLeftColor: approved ? '#10B981' : invite.status === 'open' ? '#F59E0B' : '#FB923C',
+                            padding: 12,
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                            <Text style={{ flex: 1, fontWeight: '800', color: FG, fontSize: 14 }}>{parsed.projectName}</Text>
+                            <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: statusBg }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
+                            </View>
+                          </View>
+                          <Text style={{ marginTop: 4, color: MUTED, fontSize: 12 }}>
+                            To: {rec?.name ?? roleLabel} ({roleLabel})
+                          </Text>
+                          {invite.recipient_id && approved && parsed.projectId ? (
+                            <TouchableOpacity
+                              onPress={() =>
+                                rec?.role === 'worker'
+                                  ? router.push({
+                                      pathname: '/projects/[id]',
+                                      params: { id: parsed.projectId as string, workerDetails: '1' },
+                                    })
+                                  : router.push({
+                                      pathname: '/projects/[id]',
+                                      params: { id: parsed.projectId as string },
+                                    })
+                              }
+                              style={{
+                                marginTop: 10,
+                                alignSelf: 'flex-start',
+                                borderRadius: 8,
+                                backgroundColor: '#FFF8F5',
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                              }}
+                            >
+                              <Text style={{ color: BRAND, fontSize: 12, fontWeight: '700' }}>
+                                {rec?.role === 'worker' ? 'Open worker details' : 'Open project details'}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+                      </View>
+                  )
+                })}
+              </ScrollView>
             </View>
-            <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 }}>
-              {professionalImages.map((item) => (
-                <View
-                  key={item.id}
-                  style={{
-                    width: '32%',
-                    height: 108,
-                    borderRadius: 8,
-                    overflow: 'hidden',
-                    backgroundColor: '#FFF7ED66',
-                    borderWidth: 1,
-                    borderColor: '#FFEDD5',
-                  }}
-                >
-                  <TouchableOpacity onPress={() => setActiveGalleryImageUri(item.image_url)} activeOpacity={0.9}>
-                    <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => void deleteProfessionalImage(item.id)}
-                    style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800', lineHeight: 16 }}>×</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {Array.from({ length: Math.max(0, 6 - professionalImages.length) }).map((_, index) => (
-                <View
-                  key={`placeholder-${index}`}
-                  style={{
-                    width: '32%',
-                    height: 108,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: '#FFEDD5',
-                    backgroundColor: '#FFF7ED66',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#FDBA74' }}>
-                    {`Image ${professionalImages.length + index + 1}`}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            <Text style={{ marginTop: 10, fontSize: 11, color: '#9CA3AF' }}>{`${professionalImages.length}/6 images`}</Text>
-          </View>
-        ) : null}
 
-        {trade ? (
-          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-            <Text style={{ fontWeight: '700', color: FG }}>Trade</Text>
-            <View style={{ marginTop: 6, alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#E0E7FF' }}>
-              <Text style={{ fontWeight: '600', color: '#3730A3' }}>{trade}</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: 16, marginTop: 10 }}>
+              <View style={{ flex: 1, backgroundColor: CARD_BG, borderRadius: 12, borderWidth: 0.5, borderColor: CARD_BORDER, paddingVertical: 10, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14 }}>⚙️</Text>
+                <Text style={{ fontSize: 7, fontWeight: '600', color: MUTED, marginTop: 3 }}>Settings</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: CARD_BG, borderRadius: 12, borderWidth: 0.5, borderColor: CARD_BORDER, paddingVertical: 10, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14 }}>📄</Text>
+                <Text style={{ fontSize: 7, fontWeight: '600', color: MUTED, marginTop: 3 }}>Reports</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: CARD_BG, borderRadius: 12, borderWidth: 0.5, borderColor: CARD_BORDER, paddingVertical: 10, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14 }}>❓</Text>
+                <Text style={{ fontSize: 7, fontWeight: '600', color: MUTED, marginTop: 3 }}>Help</Text>
+              </View>
             </View>
-          </View>
-        ) : null}
 
-        {receivedInvitesForDisplay.length > 0 ? (
-          <View
-            onLayout={(e) => {
-              const y = e.nativeEvent.layout.y
-              setInvitationsY(y)
-            }}
-            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>WORK INVITATIONS</Text>
-            <ScrollView
-              nestedScrollEnabled
-              scrollEnabled={receivedScrollable}
-              showsVerticalScrollIndicator={receivedScrollable}
-              style={{ height: receivedScrollable ? 280 : undefined, marginTop: 2 }}
-              contentContainerStyle={{ paddingBottom: 6 }}
+            <TouchableOpacity onPress={() => void signOut()} style={{ marginHorizontal: 16, marginTop: 10, borderWidth: 0.5, borderColor: CARD_BORDER, borderRadius: 12, paddingVertical: 11, alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color: MUTED }}>Sign out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={deleteAccount}
+              disabled={deletingAccount}
+              style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 16, borderWidth: 0.5, borderColor: '#FEE2E2', borderRadius: 12, paddingVertical: 11, alignItems: 'center', opacity: deletingAccount ? 0.6 : 1 }}
             >
-              {receivedInvitesForDisplay.map((invite) => {
-                const parsed = parseInviteSubject(invite.subject)
-                const pending = invite.status === 'open'
-                const statusLabel = pending ? 'Pending your response' : invite.status === 'responded' ? 'Approved' : 'Declined'
-                const statusColor = pending ? '#B45309' : invite.status === 'responded' ? '#166534' : '#B45309'
-                const statusBg = pending ? '#FFFBEB' : invite.status === 'responded' ? '#ECFDF3' : '#FFF7ED'
-                return (
+              <Text style={{ fontSize: 10, fontWeight: '600', color: '#991B1B' }}>{deletingAccount ? 'Deleting account...' : 'Delete account'}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <View style={{ position: 'relative', height: 130 }}>
+              {heroImage ? (
+                <Image source={{ uri: heroImage }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} resizeMode="cover" />
+              ) : (
+                <>
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#3D2A20' }} />
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(216,90,48,0.2)' }} />
+                </>
+              )}
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.38)' }} />
+              {avgRating >= 4.5 ? (
+                <View style={{ position: 'absolute', top: 10, right: 12, backgroundColor: BRAND, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFFFFF' }}>⭐ Top rated</Text>
+                </View>
+              ) : projectsCompleted >= 5 ? (
+                <View style={{ position: 'absolute', top: 10, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: '600', color: '#FFFFFF' }}>{`${projectsCompleted} projects`}</Text>
+                </View>
+              ) : null}
+              <TouchableOpacity
+                onPress={onToggleEditProfile}
+                style={{ position: 'absolute', top: 10, left: 12, backgroundColor: 'rgba(255,255,255,0.18)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}
+              >
+                <Text style={{ fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.9)' }}>{editingProfile ? 'Cancel ✕' : 'Edit ✎'}</Text>
+              </TouchableOpacity>
+              <View style={{ position: 'absolute', bottom: 10, left: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: BRAND, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                  {previewPhotoUri ? (
+                    <Image source={{ uri: previewPhotoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  ) : (
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF' }}>{row.name?.trim()?.charAt(0)?.toUpperCase() || 'U'}</Text>
+                  )}
+                </View>
+                <View>
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: '#FFFFFF' }}>{row.name}</Text>
+                  <View style={{ marginTop: 4, alignSelf: 'flex-start', backgroundColor: BRAND, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFFFFF', textTransform: 'capitalize' }}>{row.role}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={{ position: 'absolute', bottom: 14, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#F59E0B' }}>{`★ ${avgRating.toFixed(1)}`}</Text>
+              </View>
+            </View>
+
+            <View style={{ backgroundColor: CARD_BG, flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 0.5, borderBottomColor: CARD_BORDER }}>
+              <TouchableOpacity onPress={scrollToReviews} style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND }}>{avgRating.toFixed(1)}</Text>
+                <Text style={{ fontSize: 7, color: MUTED, marginTop: 2 }}>Rating</Text>
+              </TouchableOpacity>
+              <View style={{ width: 0.5, backgroundColor: CARD_BORDER }} />
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND }}>{projectsCompleted}</Text>
+                <Text style={{ fontSize: 7, color: MUTED, marginTop: 2 }}>Done</Text>
+              </View>
+              <View style={{ width: 0.5, backgroundColor: CARD_BORDER }} />
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND }}>{profileViews}</Text>
+                <Text style={{ fontSize: 7, color: MUTED, marginTop: 2 }}>Views</Text>
+              </View>
+              <View style={{ width: 0.5, backgroundColor: CARD_BORDER }} />
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: BRAND }}>{`${row.role === 'contractor' ? contractorYearsExperience : workerYearsExperience}y`}</Text>
+                <Text style={{ fontSize: 7, color: MUTED, marginTop: 2 }}>Exp</Text>
+              </View>
+            </View>
+
+            <View style={{ paddingHorizontal: 16, paddingVertical: 14, backgroundColor: CARD_BG, borderBottomWidth: 0.5, borderBottomColor: CARD_BORDER }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`📍 ${row.city ?? '—'} · ${row.pincode ?? '—'}`}</Text>
+              <Text style={{ marginTop: 10, fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`📞 ${formatPhoneIndian(row.phone_number)}`}</Text>
+              <Text style={{ marginTop: 10, fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`👷 ${row.role === 'contractor' ? contractorYearsExperience : workerYearsExperience} yrs experience`}</Text>
+            </View>
+
+            {((row.role === 'contractor' && contractorSpecialisations.length > 0) ||
+              (row.role === 'worker' && workerSkillTags.length > 0)) ? (
+              <View style={{ paddingHorizontal: 16, paddingTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {(row.role === 'contractor' ? contractorSpecialisations : workerSkillTags).map((s, idx) => (
+                  <View key={`${s}-${idx}`} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: BRAND }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>{s}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {editingProfile ? (
+              <View style={{ marginHorizontal: 16, marginBottom: 10, backgroundColor: CARD_BG, borderRadius: 16, borderWidth: 0.5, borderColor: CARD_BORDER, padding: 16 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>EDIT PROFILE</Text>
+                <TouchableOpacity
+                  onPress={() => void pickProfilePhoto()}
+                  disabled={uploadingPhoto}
+                  style={{ marginTop: 10, minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: '#C2410C', fontWeight: '700' }}>{uploadingPhoto ? 'Uploading...' : 'Change profile photo'}</Text>
+                </TouchableOpacity>
+                {(row.role === 'contractor' || row.role === 'worker') ? (
+                  <>
+                    <Text style={{ marginTop: 10, marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Years experience</Text>
+                    <TextInput
+                      value={editYearsExperience}
+                      onChangeText={(t) => setEditYearsExperience(t.replace(/[^\d]/g, ''))}
+                      keyboardType="number-pad"
+                      style={inputStyle}
+                    />
+                  </>
+                ) : null}
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>City</Text>
+                    <TextInput value={editCity} onChangeText={setEditCity} style={inputStyle} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ marginBottom: 6, fontSize: 11, fontWeight: '700', color: '#6B7280' }}>Pincode</Text>
+                    <TextInput
+                      value={editPincode}
+                      onChangeText={(t) => setEditPincode(t.replace(/[^\d]/g, '').slice(0, 6))}
+                      keyboardType="number-pad"
+                      style={inputStyle}
+                    />
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => void saveProfileEdits()}
+                  disabled={savingProfile || uploadingPhoto}
+                  style={{ marginTop: 14, minHeight: 46, borderRadius: 10, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center', opacity: savingProfile || uploadingPhoto ? 0.7 : 1 }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{savingProfile ? 'Saving...' : 'Save profile'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            <View style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: CARD_BG, borderRadius: 16, borderWidth: 0.5, borderColor: CARD_BORDER, overflow: 'hidden' }}>
+              <View style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: PAGE_BG, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#A8A29E', letterSpacing: 0.6 }}>PORTFOLIO</Text>
+                <TouchableOpacity
+                  onPress={() => void addProfessionalImage()}
+                  disabled={uploadingPhoto}
+                  style={{ backgroundColor: BRAND_LIGHT, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 0.5, borderColor: BRAND_BORDER, opacity: uploadingPhoto ? 0.7 : 1 }}
+                >
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: BRAND }}>{uploadingPhoto ? 'Uploading...' : '+ Add image'}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ padding: 10, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 }}>
+                {professionalImages.map((item) => (
                   <View
-                    key={invite.id}
+                    key={item.id}
                     style={{
-                      marginTop: 10,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: '#F1F5F9',
-                      backgroundColor: '#FFFFFF',
-                      borderLeftWidth: 4,
-                      borderLeftColor: pending ? '#F59E0B' : invite.status === 'responded' ? '#10B981' : '#FB923C',
-                      padding: 12,
+                      width: '32%',
+                      height: 100,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      backgroundColor: PAGE_BG,
+                      borderWidth: 0.5,
+                      borderColor: CARD_BORDER,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                      <Text style={{ flex: 1, fontWeight: '800', color: FG, fontSize: 14 }}>{parsed.projectName}</Text>
-                      <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: statusBg }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
-                      </View>
-                    </View>
-                    <Text style={{ marginTop: 6, color: MUTED, fontSize: 12 }}>
-                      From: {invite.customer_id ? customerNames.get(invite.customer_id) ?? 'Customer' : 'Customer'}
-                    </Text>
-                    {pending && parsed.projectId ? (
-                      <View style={{ marginTop: 10 }}>
-                        <InvitationActions projectId={parsed.projectId} onDone={() => void load()} />
-                      </View>
-                    ) : null}
+                    <TouchableOpacity onPress={() => setActiveGalleryImageUri(item.image_url)} activeOpacity={0.9}>
+                      <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => void deleteProfessionalImage(item.id)}
+                      style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800', lineHeight: 16 }}>×</Text>
+                    </TouchableOpacity>
                   </View>
-                )
-              })}
-            </ScrollView>
-          </View>
-        ) : null}
+                ))}
+                {Array.from({ length: Math.max(0, 6 - professionalImages.length) }).map((_, index) => (
+                  <View
+                    key={`placeholder-${index}`}
+                    style={{
+                      width: '32%',
+                      height: 100,
+                      borderRadius: 10,
+                      borderWidth: 0.5,
+                      borderColor: CARD_BORDER,
+                      backgroundColor: BRAND_LIGHT,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 9, fontWeight: '600', color: BRAND }}>
+                      {`Image ${professionalImages.length + index + 1}`}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={{ paddingHorizontal: 14, paddingBottom: 10 }}>
+                <Text style={{ fontSize: 9, color: MUTED }}>{`${professionalImages.length}/6 images`}</Text>
+              </View>
+            </View>
 
-        {sentInvitesForDisplay.length > 0 ? (
-          <View
-            onLayout={(e) => {
-              const y = e.nativeEvent.layout.y
-              setInvitationsY((prev) => (prev === 0 ? y : prev))
-            }}
-            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>INVITATIONS SENT</Text>
-            <ScrollView
-              nestedScrollEnabled
-              scrollEnabled={sentScrollable}
-              showsVerticalScrollIndicator={sentScrollable}
-              style={{ height: sentScrollable ? 280 : undefined, marginTop: 2 }}
-              contentContainerStyle={{ paddingBottom: 6 }}
+            {trade ? (
+              <View style={{ paddingHorizontal: 16, marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: MUTED }}>Trade:</Text>
+                <View style={{ backgroundColor: '#E0E7FF', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ fontWeight: '700', color: '#3730A3', fontSize: 11 }}>{trade}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <View
+              onLayout={(e) => {
+                const y = e.nativeEvent.layout.y
+                setInvitationsY(y)
+              }}
+              style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: CARD_BG, borderRadius: 16, borderWidth: 0.5, borderColor: CARD_BORDER, overflow: 'hidden' }}
             >
-              {sentInvitesForDisplay.map((invite) => {
-                  const parsed = parseInviteSubject(invite.subject)
-                  const rec = invite.recipient_id ? recipientMap.get(invite.recipient_id) : undefined
-                  const approvedByMembership = sentInviteApproved.get(invite.id) === true
-                  const inviteRole = sentInviteRole.get(invite.id) ?? (rec?.role === 'worker' ? 'worker' : 'contractor')
-                  const roleLabel = inviteRole === 'worker' ? 'Worker' : 'Contractor'
-                  const waitingLabel = inviteRole === 'worker' ? 'Waiting worker approval' : 'Waiting contractor approval'
-                  const statusLabel =
-                    approvedByMembership || invite.status === 'responded'
-                      ? 'Invitation approved'
-                      : invite.status === 'open'
-                        ? waitingLabel
-                        : 'Declined'
-                  const approved = approvedByMembership || invite.status === 'responded'
-                  const statusColor = approved ? '#166534' : invite.status === 'open' ? '#B45309' : '#B45309'
-                  const statusBg = approved ? '#ECFDF3' : invite.status === 'open' ? '#FFFBEB' : '#FFF7ED'
-                return (
+              <View style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: PAGE_BG, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#A8A29E', letterSpacing: 0.6 }}>WORK INVITATIONS</Text>
+                {receivedInvitesForDisplay.length > 0 ? <Text style={{ fontSize: 9, color: BRAND, fontWeight: '700' }}>{receivedInvitesForDisplay.length}</Text> : null}
+              </View>
+              {receivedInvitesForDisplay.length === 0 ? (
+                <Text style={{ padding: 12, color: MUTED, fontSize: 12 }}>No work invitations.</Text>
+              ) : (
+                <ScrollView
+                  nestedScrollEnabled
+                  scrollEnabled={receivedScrollable}
+                  showsVerticalScrollIndicator={receivedScrollable}
+                  style={{ height: receivedScrollable ? 280 : undefined }}
+                  contentContainerStyle={{ paddingBottom: 0 }}
+                >
+                  {receivedInvitesForDisplay.map((invite, index) => {
+                    const parsed = parseInviteSubject(invite.subject)
+                    const pending = invite.status === 'open'
+                    const statusLabel = pending ? 'Pending your response' : invite.status === 'responded' ? 'Approved' : 'Declined'
+                    const statusColor = pending ? '#B45309' : invite.status === 'responded' ? '#166534' : '#B45309'
+                    const statusBg = pending ? '#FFFBEB' : invite.status === 'responded' ? '#ECFDF3' : '#FFF7ED'
+                    return (
+                      <View key={invite.id} style={{ padding: 12, borderBottomWidth: index === receivedInvitesForDisplay.length - 1 ? 0 : 0.5, borderColor: PAGE_BG }}>
+                        <View style={{ borderRadius: 12, borderWidth: 1, borderColor: '#F1F5F9', backgroundColor: '#FFFFFF', borderLeftWidth: 4, borderLeftColor: pending ? '#F59E0B' : invite.status === 'responded' ? '#10B981' : '#FB923C', padding: 12 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                            <Text style={{ flex: 1, fontWeight: '800', color: FG, fontSize: 14 }}>{parsed.projectName}</Text>
+                            <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: statusBg }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
+                            </View>
+                          </View>
+                          <Text style={{ marginTop: 6, color: MUTED, fontSize: 12 }}>
+                            From: {invite.customer_id ? customerNames.get(invite.customer_id) ?? 'Customer' : 'Customer'}
+                          </Text>
+                          {pending && parsed.projectId ? (
+                            <View style={{ marginTop: 10 }}>
+                              <InvitationActions projectId={parsed.projectId} onDone={() => void load()} />
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    )
+                  })}
+                </ScrollView>
+              )}
+            </View>
+
+            <View style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: CARD_BG, borderRadius: 16, borderWidth: 0.5, borderColor: CARD_BORDER, overflow: 'hidden' }}>
+              <View style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: PAGE_BG, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#A8A29E', letterSpacing: 0.6 }}>PAYMENT APPROVALS</Text>
+                {pendingPayments.length > 0 ? <Text style={{ fontSize: 9, color: BRAND, fontWeight: '700' }}>{pendingPayments.length}</Text> : null}
+              </View>
+              {pendingPayments.length === 0 ? (
+                <Text style={{ padding: 12, color: MUTED, fontSize: 12 }}>No pending payment approvals.</Text>
+              ) : (
+                pendingPayments.map((payment, index) => (
+                  <View key={payment.id} style={{ padding: 12, borderBottomWidth: index === pendingPayments.length - 1 ? 0 : 0.5, borderColor: PAGE_BG }}>
                     <View
-                      key={invite.id}
                       style={{
-                        marginTop: 10,
                         borderRadius: 12,
                         borderWidth: 1,
                         borderColor: '#F1F5F9',
                         backgroundColor: '#FFFFFF',
                         borderLeftWidth: 4,
-                        borderLeftColor: approved ? '#10B981' : invite.status === 'open' ? '#F59E0B' : '#FB923C',
+                        borderLeftColor: '#F59E0B',
                         padding: 12,
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                        <Text style={{ flex: 1, fontWeight: '800', color: FG, fontSize: 14 }}>{parsed.projectName}</Text>
-                        <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: statusBg }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
-                        </View>
-                      </View>
+                      <Text style={{ fontWeight: '800', color: FG, fontSize: 14 }}>{payment.project_name}</Text>
                       <Text style={{ marginTop: 4, color: MUTED, fontSize: 12 }}>
-                        To: {rec?.name ?? roleLabel} ({roleLabel})
+                        {`Amount: ₹${payment.amount.toLocaleString('en-IN')} · ${payment.paid_to_category}`}
                       </Text>
-                      {invite.recipient_id && approved && parsed.projectId ? (
+                      <TouchableOpacity
+                        onPress={() =>
+                          router.push({
+                            pathname: '/projects/[id]',
+                            params: { id: payment.project_id, tab: 'payments', paymentId: payment.id },
+                          })
+                        }
+                        style={{ marginTop: 8, alignSelf: 'flex-start' }}
+                      >
+                        <Text style={{ color: BRAND, fontSize: 12, fontWeight: '700' }}>Open payments tab</Text>
+                      </TouchableOpacity>
+                      <View style={{ marginTop: 10, flexDirection: 'row', gap: 10 }}>
                         <TouchableOpacity
-                          onPress={() =>
-                            rec?.role === 'worker'
-                              ? router.push({
-                                  pathname: '/projects/[id]',
-                                  params: { id: parsed.projectId as string, workerDetails: '1' },
-                                })
-                              : router.push({
-                                  pathname: '/projects/[id]',
-                                  params: { id: parsed.projectId as string },
-                                })
-                          }
-                          style={{
-                            marginTop: 10,
-                            alignSelf: 'flex-start',
-                            borderRadius: 8,
-                            backgroundColor: '#FFF8F5',
-                            paddingHorizontal: 10,
-                            paddingVertical: 6,
-                          }}
+                          onPress={() => void respondToPaymentApproval(payment, 'approve')}
+                          disabled={paymentActionId === payment.id}
+                          style={{ flex: 1, minHeight: 48, borderRadius: 10, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', opacity: paymentActionId === payment.id ? 0.7 : 1 }}
                         >
-                          <Text style={{ color: BRAND, fontSize: 12, fontWeight: '700' }}>
-                            {rec?.role === 'worker' ? 'Open worker details' : 'Open project details'}
-                          </Text>
+                          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{paymentActionId === payment.id ? 'Saving...' : 'Approve'}</Text>
                         </TouchableOpacity>
-                      ) : null}
+                        <TouchableOpacity
+                          onPress={() => void respondToPaymentApproval(payment, 'decline')}
+                          disabled={paymentActionId === payment.id}
+                          style={{ flex: 1, minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', opacity: paymentActionId === payment.id ? 0.7 : 1 }}
+                        >
+                          <Text style={{ color: '#DC2626', fontWeight: '700' }}>{paymentActionId === payment.id ? 'Saving...' : 'Decline'}</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                )
-              })}
-            </ScrollView>
-          </View>
-        ) : null}
+                  </View>
+                ))
+              )}
+            </View>
 
-        {pendingPayments.length > 0 ? (
-          <View style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>PAYMENT APPROVAL REQUESTS</Text>
-            {pendingPayments.map((payment) => (
+            <View
+              onLayout={(e) => {
+                setReviewsY(e.nativeEvent.layout.y)
+              }}
+              style={{
+                marginHorizontal: 16,
+                marginTop: 12,
+                backgroundColor: PAGE_BG,
+                borderRadius: 16,
+                borderWidth: 0.5,
+                borderColor: CARD_BORDER,
+                overflow: 'hidden',
+              }}
+            >
               <View
-                key={payment.id}
                 style={{
-                  marginTop: 10,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: '#F1F5F9',
-                  backgroundColor: '#FFFFFF',
-                  borderLeftWidth: 4,
-                  borderLeftColor: '#F59E0B',
-                  padding: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: 'rgba(232,221,212,0.85)',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
-                <Text style={{ fontWeight: '800', color: FG, fontSize: 14 }}>{payment.project_name}</Text>
-                <Text style={{ marginTop: 4, color: MUTED, fontSize: 12 }}>
-                  {`Amount: ₹${payment.amount.toLocaleString('en-IN')} · ${payment.paid_to_category}`}
-                </Text>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: '/projects/[id]',
-                      params: { id: payment.project_id, tab: 'payments', paymentId: payment.id },
-                    })
-                  }
-                  style={{ marginTop: 8, alignSelf: 'flex-start' }}
-                >
-                  <Text style={{ color: BRAND, fontSize: 12, fontWeight: '700' }}>Open payments tab</Text>
-                </TouchableOpacity>
-                <View style={{ marginTop: 10, flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity
-                    onPress={() => void respondToPaymentApproval(payment, 'approve')}
-                    disabled={paymentActionId === payment.id}
-                    style={{ flex: 1, minHeight: 48, borderRadius: 10, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', opacity: paymentActionId === payment.id ? 0.7 : 1 }}
-                  >
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{paymentActionId === payment.id ? 'Saving...' : 'Approve'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => void respondToPaymentApproval(payment, 'decline')}
-                    disabled={paymentActionId === payment.id}
-                    style={{ flex: 1, minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', opacity: paymentActionId === payment.id ? 0.7 : 1 }}
-                  >
-                    <Text style={{ color: '#DC2626', fontWeight: '700' }}>{paymentActionId === payment.id ? 'Saving...' : 'Decline'}</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#57534E', letterSpacing: 0.6 }}>REVIEWS</Text>
+                <Text style={{ fontSize: 11, color: BRAND, fontWeight: '700' }}>{formatReviewsSectionCount(reviewItems.length)}</Text>
               </View>
-            ))}
-          </View>
-        ) : null}
-
-        {(row.role === 'contractor' || row.role === 'worker') ? (
-          <View
-            onLayout={(e) => {
-              setReviewsY(e.nativeEvent.layout.y)
-            }}
-            style={{ marginHorizontal: 16, marginTop: 16, borderRadius: 12, backgroundColor: '#FFFFFF', padding: 14, borderWidth: 1, borderColor: '#F2EDE8' }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#999' }}>REVIEWS</Text>
-            {reviewItems.length === 0 ? (
-              <Text style={{ marginTop: 10, color: MUTED, fontSize: 13 }}>No reviews yet.</Text>
-            ) : (
-              reviewItems.map((review) => (
-                <View
-                  key={review.id}
-                  style={{
-                    marginTop: 10,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: '#F1F5F9',
-                    backgroundColor: '#FFFFFF',
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#D85A30',
-                    padding: 12,
-                  }}
-                >
-                  <Text style={{ fontWeight: '800', color: FG, fontSize: 14 }}>{review.project_name}</Text>
-                  <Text style={{ marginTop: 4, color: '#B45309', fontSize: 12, fontWeight: '700' }}>
-                    {`★ ${review.rating.toFixed(1)} · by ${review.reviewer_name}`}
-                  </Text>
-                  {review.comment ? (
-                    <Text style={{ marginTop: 6, color: MUTED, fontSize: 13 }}>{review.comment}</Text>
-                  ) : (
-                    <Text style={{ marginTop: 6, color: '#9CA3AF', fontSize: 12 }}>No written comment</Text>
-                  )}
+              {reviewItems.length === 0 ? (
+                <Text style={{ paddingHorizontal: 16, paddingVertical: 14, color: MUTED, fontSize: 13 }}>No reviews yet.</Text>
+              ) : (
+                <View style={{ paddingHorizontal: 10, paddingTop: 10, paddingBottom: 12, gap: 8 }}>
+                {reviewItems.map((review) => {
+                  const parsed = parseReviewComment(review.comment)
+                  const reviewerLabel = (review.reviewer_name ?? '').trim() || 'Customer'
+                  const initial = reviewerLabel.charAt(0).toUpperCase()
+                  return (
+                    <View
+                      key={review.id}
+                      style={{
+                        borderRadius: 14,
+                        overflow: 'hidden',
+                        borderWidth: 0.5,
+                        borderColor: '#E8DDD4',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: REVIEW_CARD_HEADER_BG,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 10,
+                          borderTopLeftRadius: 14,
+                          borderTopRightRadius: 14,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 15,
+                            backgroundColor: '#D85A30',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            borderWidth: 2,
+                            borderColor: 'rgba(255,255,255,0.18)',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>{initial}</Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }} numberOfLines={1}>
+                            {reviewerLabel}
+                          </Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                            <ReviewStarRow rating={review.rating} />
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF' }}>{review.rating.toFixed(1)}</Text>
+                            <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>·</Text>
+                            <Text style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)' }}>
+                              {reviewListingTimeLabel(review.created_at, reviewListClockMs)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 8,
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 6,
+                          backgroundColor: '#FFFFFF',
+                          borderBottomWidth: parsed.comment || parsed.overallComment ? 0.5 : 0,
+                          borderBottomColor: '#F2EDE8',
+                        }}
+                      >
+                        {METRIC_CONFIG.map((metric) => {
+                          const score = reviewMetricScore(parsed, metric.key)
+                          if (score === null) return null
+                          const isFull = score === 5
+                          return (
+                            <View
+                              key={metric.key}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 3,
+                                backgroundColor: isFull ? '#F0FDF4' : '#FBF0EB',
+                                borderWidth: 0.5,
+                                borderColor: isFull ? '#BBF7D0' : '#F5DDD4',
+                                borderRadius: 20,
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                              }}
+                            >
+                              <Text style={{ fontSize: 10 }}>{metric.emoji}</Text>
+                              <Text style={{ fontSize: 9, fontWeight: '600', color: '#2C2C2A' }}>{metric.label}</Text>
+                              <Text style={{ fontSize: 9, fontWeight: '800', color: isFull ? '#166534' : '#D85A30' }}>
+                                {score}/5
+                              </Text>
+                            </View>
+                          )
+                        })}
+                      </View>
+                      {parsed.comment || parsed.overallComment ? (
+                        <View style={{ paddingHorizontal: 10, paddingBottom: 10, paddingTop: 0, backgroundColor: '#FFFFFF' }}>
+                          <View
+                            style={{
+                              backgroundColor: '#FBF0EB',
+                              borderRadius: 10,
+                              paddingVertical: 10,
+                              paddingHorizontal: 10,
+                              borderLeftWidth: 3,
+                              borderLeftColor: '#D85A30',
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, color: '#78716C', lineHeight: 17, fontStyle: 'italic' }}>
+                              {`"${parsed.comment ?? parsed.overallComment}"`}
+                            </Text>
+                          </View>
+                        </View>
+                      ) : null}
+                    </View>
+                  )
+                })}
                 </View>
-              ))
-            )}
-          </View>
-        ) : null}
+              )}
+            </View>
 
-        <TouchableOpacity
-          onPress={() => void signOut()}
-          style={{
-            marginHorizontal: 16,
-            marginTop: 16,
-            minHeight: 52,
-            borderRadius: 14,
-            borderWidth: 2,
-            borderColor: '#EF4444',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ fontWeight: '700', color: '#EF4444' }}>Sign out</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={deleteAccount}
-          disabled={deletingAccount}
-          style={{
-            marginHorizontal: 16,
-            marginTop: 10,
-            minHeight: 52,
-            borderRadius: 14,
-            borderWidth: 2,
-            borderColor: '#DC2626',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: deletingAccount ? 0.6 : 1,
-          }}
-        >
-          <Text style={{ fontWeight: '700', color: '#DC2626' }}>
-            {deletingAccount ? 'Deleting account...' : 'Delete account'}
-          </Text>
-        </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: 16, marginTop: 14 }}>
+              <TouchableOpacity onPress={() => void signOut()} style={{ flex: 1, borderWidth: 0.5, borderColor: CARD_BORDER, borderRadius: 12, paddingVertical: 10, alignItems: 'center' }}>
+                <Text style={{ fontSize: 10, fontWeight: '600', color: MUTED }}>Sign out</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={deleteAccount} disabled={deletingAccount} style={{ flex: 1, borderWidth: 0.5, borderColor: '#FEE2E2', borderRadius: 12, paddingVertical: 10, alignItems: 'center', opacity: deletingAccount ? 0.6 : 1 }}>
+                <Text style={{ fontSize: 10, fontWeight: '600', color: '#991B1B' }}>{deletingAccount ? 'Deleting...' : 'Delete account'}</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </ScrollView>
       <Modal
         visible={Boolean(activeGalleryImageUri)}

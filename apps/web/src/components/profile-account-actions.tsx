@@ -35,11 +35,9 @@ export default function ProfileAccountActions() {
       type="button"
       onClick={() => void onDeleteAccount()}
       disabled={deleting}
-      className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors hover:bg-red-50 disabled:opacity-60"
-      style={{ border: '2px solid #DC2626', color: '#DC2626' }}
+      className="w-full rounded-xl border border-[#E8DDD4] py-2.5 text-[10px] font-semibold text-[#78716C] transition-colors hover:bg-[#F2EDE8] disabled:opacity-60"
     >
       {deleting ? 'Deleting account...' : 'Delete account'}
     </button>
   )
 }
-

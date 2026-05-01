@@ -38,7 +38,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const loadProfileByUserId = async (userId: string) =>
     admin
       .from('users')
-      .select('id,name,city,bio,phone_number,role,profile_photo_url,contractor_profiles(*),worker_profiles(*)')
+      .select('id,name,city,pincode,bio,phone_number,role,profile_photo_url,contractor_profiles(*),worker_profiles(*)')
       .eq('id', userId)
       .maybeSingle()
 
@@ -236,6 +236,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     role: contractor.role,
     name: contractor.name,
     city: contractor.city,
+    pincode: contractor.pincode ?? null,
     phone_number: contractor.phone_number,
     profile_photo_url: contractor.profile_photo_url ?? null,
     bio: contractor.bio,
@@ -273,7 +274,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       : null,
     reviews: (reviews ?? []).map((review) => ({
       ...review,
-      reviewer_name: reviewerNameById.get(review.reviewer_id) ?? 'Customer',
+      reviewer_name: (reviewerNameById.get(review.reviewer_id) ?? '').trim() || 'Customer',
     })),
     professional_images: (professionalImagesRows ?? []).map((item: { id: string; image_url: string; created_at: string }) => ({
       id: item.id,

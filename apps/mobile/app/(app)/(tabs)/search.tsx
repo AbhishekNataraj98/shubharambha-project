@@ -99,7 +99,7 @@ export default function SearchTab() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F2EDE8' }} edges={[]}>
       <KeyboardSafeView includeTopSafeArea={false}>
         <View style={{ flex: 1 }}>
           <FlatList

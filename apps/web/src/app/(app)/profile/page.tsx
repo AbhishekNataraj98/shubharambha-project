@@ -7,44 +7,17 @@ import BottomNav from '@/components/shared/bottom-nav'
 import ProfileAccountActions from '@/components/profile-account-actions'
 import InvitationActions from '@/components/shared/invitation-actions'
 import PaymentApprovalActions from '@/components/shared/payment-approval-actions'
-import ProfileEditForm from '@/components/profile-edit-form'
 import ProfessionalImagesManager from '@/components/professional-images-manager'
+import { ProfileEditPanelProvider, ProfileEditFormWithPanel } from '@/components/profile/profile-edit-panel'
+import CustomerProfileHeader from '@/components/profile/customer-profile-header'
+import ProfessionalProfileHero from '@/components/profile/professional-profile-hero'
+import ConceptBReviewCards from '@/components/profile/concept-b-review-cards'
+import { formatPhoneIndian, formatReviewsSectionCount } from '@/lib/utils'
 
 function parseInviteSubject(subject: string) {
   const match = subject.match(/\[([0-9a-fA-F-]{36})\]:\s*(.+)$/)
   if (!match) return { projectId: null, projectName: subject }
   return { projectId: match[1], projectName: match[2] }
-}
-
-function initialsFromName(name?: string | null) {
-  if (!name) return 'U'
-  const parts = name.trim().split(/\s+/).slice(0, 2)
-  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('') || 'U'
-}
-
-function formatPhoneIndian(phone?: string | null) {
-  if (!phone) return 'Not available'
-  const digits = phone.replace(/\D/g, '')
-  const local = digits.length >= 10 ? digits.slice(-10) : digits
-  if (local.length !== 10) return phone
-  return `+91 ${local.slice(0, 5)} ${local.slice(5)}`
-}
-
-function getStatusBarColor(status: string) {
-  if (status === 'on_hold') return '#F59E0B'
-  if (status === 'active') return '#10B981'
-  if (status === 'completed') return '#6B7280'
-  if (status === 'cancelled') return '#EF4444'
-  return '#E0D5CC'
-}
-
-const stagePillClass: Record<string, string> = {
-  foundation: 'bg-gray-100 text-gray-700',
-  plinth: 'bg-blue-100 text-blue-700',
-  walls: 'bg-amber-100 text-amber-700',
-  slab: 'bg-orange-100 text-orange-700',
-  plastering: 'bg-purple-100 text-purple-700',
-  finishing: 'bg-green-100 text-green-700',
 }
 
 async function signOutAction() {
@@ -74,6 +47,7 @@ export default async function ProfilePage() {
   )
 
   let specialisations: string[] = []
+  let workerSkillTags: string[] = []
   let trade: string | null = null
   let contractorYearsExperience = 0
   let workerYearsExperience = 0
@@ -90,7 +64,9 @@ export default async function ProfilePage() {
       ? (record.specialisations as string[])
       : Array.isArray(record.specialization)
         ? (record.specialization as string[])
-        : []
+        : Array.isArray(record.skill_tags)
+          ? (record.skill_tags as string[])
+          : []
     contractorYearsExperience = Number(record.years_experience ?? 0)
   }
 
@@ -102,7 +78,14 @@ export default async function ProfilePage() {
       .maybeSingle()
 
     const record = (workerProfile ?? {}) as Record<string, unknown>
-    trade = typeof record.trade === 'string' ? record.trade : Array.isArray(record.skill_tags) ? String((record.skill_tags as string[])[0] ?? '') : null
+    const rawWorkerTags = Array.isArray(record.skill_tags) ? (record.skill_tags as unknown[]) : []
+    workerSkillTags = [...new Set(rawWorkerTags.map((t) => String(t).trim()).filter(Boolean))]
+    trade =
+      typeof record.trade === 'string'
+        ? record.trade
+        : workerSkillTags[0]
+          ? workerSkillTags[0]
+          : null
     workerYearsExperience = Number(record.years_experience ?? 0)
   }
 
@@ -146,15 +129,10 @@ export default async function ProfilePage() {
     project_id: string
   }>
   const reviewerIds = Array.from(new Set(reviewRows.map((review) => review.reviewer_id)))
-  const reviewedProjectIds = Array.from(new Set(reviewRows.map((review) => review.project_id)))
   const { data: reviewUsers } = reviewerIds.length
     ? await admin.from('users').select('id,name').in('id', reviewerIds)
     : { data: [] as Array<{ id: string; name: string }> }
   const reviewerNameById = new Map((reviewUsers ?? []).map((u) => [u.id, u.name]))
-  const { data: reviewedProjects } = reviewedProjectIds.length
-    ? await admin.from('projects').select('id,name').in('id', reviewedProjectIds)
-    : { data: [] as Array<{ id: string; name: string }> }
-  const reviewedProjectNameById = new Map((reviewedProjects ?? []).map((project) => [project.id, project.name]))
 
   let projectsCompleted = 0
   if (profile.role === 'contractor') {
@@ -262,324 +240,320 @@ export default async function ProfilePage() {
     const approvedByMembership = approvedInviteMap.get(invite.id) === true
     return invite.status !== 'responded' && !approvedByMembership
   })
+  const customerActiveCount = Array.from(approvedInviteMap.values()).filter(Boolean).length
 
   return (
-    <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2EDE8' }}>
-      <div className="mx-auto w-full max-w-md px-4 pt-6">
-        <section className="mb-6 flex justify-center">
-          <div
-            className="flex h-22 w-22 items-center justify-center rounded-full text-3xl font-bold text-white"
-            style={{
-              width: '88px',
-              height: '88px',
-              backgroundColor: '#D85A30',
-              border: '3px solid white',
-              overflow: 'hidden',
-            }}
-          >
-            {profile.profile_photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.profile_photo_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              profile.name?.trim()?.charAt(0)?.toUpperCase() || 'U'
-            )}
-          </div>
-        </section>
+    <div className="min-h-screen pb-28" style={{ backgroundColor: '#F2EDE8' }}>
+      <div className="mx-auto w-full max-w-md">
+        {profile.role === 'customer' ? (
+          <ProfileEditPanelProvider>
+            <CustomerProfileHeader
+              name={profile.name}
+              role={profile.role}
+              phone={profile.phone_number}
+              city={profile.city}
+              pincode={profile.pincode}
+              profilePhotoUrl={profile.profile_photo_url}
+              invitationsPending={sentEnquiriesForDisplay.length}
+              activeCount={customerActiveCount}
+              completedCount={projectsCompleted}
+            />
+            <ProfileEditFormWithPanel
+              role={profile.role}
+              initialPhotoUrl={profile.profile_photo_url ?? ''}
+              initialCity={profile.city ?? ''}
+              initialPincode={profile.pincode ?? ''}
+              initialYearsExperience={contractorYearsExperience}
+              initialWorkerYearsExperience={workerYearsExperience}
+            />
 
-        <ProfileEditForm
-          role={profile.role}
-          initialPhotoUrl={profile.profile_photo_url ?? ''}
-          initialCity={profile.city ?? ''}
-          initialPincode={profile.pincode ?? ''}
-          initialYearsExperience={contractorYearsExperience}
-          initialWorkerYearsExperience={workerYearsExperience}
-        />
+            <section className="mx-4 mb-4 mt-3.5 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white">
+              <div className="flex items-center justify-between border-b border-[#F2EDE8] px-4 py-3">
+                <p className="text-[9px] font-bold tracking-widest" style={{ color: '#A8A29E' }}>INVITATIONS SENT</p>
+                {sentEnquiriesForDisplay.length > 0 ? (
+                  <p className="text-[9px] font-bold text-[#D85A30]">{`${sentEnquiriesForDisplay.length} pending`}</p>
+                ) : null}
+              </div>
+              <div
+                className="pr-1"
+                style={{ maxHeight: sentEnquiriesForDisplay.length > 2 ? 320 : undefined, overflowY: sentEnquiriesForDisplay.length > 2 ? 'auto' : 'visible' }}
+              >
+                {sentEnquiriesForDisplay.map((invite, index) => {
+                  const parsed = parseInviteSubject(invite.subject)
+                  const recipient = recipientMap.get(invite.recipient_id)
+                  const approvedByMembership = approvedInviteMap.get(invite.id) === true
+                  const inviteRole = pendingInviteRoleMap.get(invite.id) ?? (recipient?.role === 'worker' ? 'worker' : 'contractor')
+                  const roleLabel = inviteRole === 'worker' ? 'Worker' : 'Contractor'
+                  const waitingLabel = inviteRole === 'worker' ? 'Waiting worker approval' : 'Waiting contractor approval'
+                  const statusLabel =
+                    approvedByMembership || invite.status === 'responded'
+                      ? 'Invitation approved'
+                      : invite.status === 'open'
+                        ? waitingLabel
+                        : 'Declined'
+                  const approved = approvedByMembership || invite.status === 'responded'
+                  const statusClass = approved
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : invite.status === 'open'
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-orange-50 text-orange-700'
+                  return (
+                    <div key={invite.id} className="border-b border-[#F2EDE8] px-4 py-3" style={{ borderBottomWidth: index === sentEnquiriesForDisplay.length - 1 ? 0 : 1 }}>
+                      <div className="rounded-xl border border-slate-100 bg-white p-3" style={{ borderLeft: `4px solid ${approved ? '#10B981' : invite.status === 'open' ? '#F59E0B' : '#FB923C'}` }}>
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>{parsed.projectName}</p>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
+                        </div>
+                        <p className="mt-1 text-xs" style={{ color: '#7A6F66' }}>
+                          To: {recipient?.name ?? roleLabel} ({roleLabel})
+                        </p>
+                        {parsed.projectId && approved ? (
+                          <Link
+                            href={
+                              recipient?.role === 'worker'
+                                ? `/projects/${parsed.projectId}?workerDetails=1`
+                                : `/projects/${parsed.projectId}`
+                            }
+                            className="mt-3 inline-flex rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs font-semibold"
+                            style={{ color: '#D85A30' }}
+                          >
+                            {recipient?.role === 'worker' ? 'Open worker details' : 'Open project details'}
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
 
-        {/* Profile Info */}
-        <section className="mb-6 text-center">
-          <h2 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
-            {profile.name}
-          </h2>
-          <div className="mt-3 inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-white" style={{ backgroundColor: '#D85A30' }}>
-            {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-          </div>
-          <p className="mt-3 text-sm font-medium" style={{ color: '#7A6F66' }}>
-            {formatPhoneIndian(profile.phone_number)}
-          </p>
-          <p className="mt-1 text-xs font-medium" style={{ color: '#999' }}>
-            {profile.city} · {profile.pincode}
-          </p>
-        </section>
+            <section className="mx-4 mb-4 mt-2.5 flex gap-2">
+              <div className="flex-1 cursor-default rounded-xl border border-[#E8DDD4] bg-white py-2.5 text-center">
+                <div className="text-sm">⚙️</div>
+                <p className="mt-1 text-[7px] font-semibold" style={{ color: '#78716C' }}>Settings</p>
+              </div>
+              <div className="flex-1 cursor-default rounded-xl border border-[#E8DDD4] bg-white py-2.5 text-center">
+                <div className="text-sm">📄</div>
+                <p className="mt-1 text-[7px] font-semibold" style={{ color: '#78716C' }}>Reports</p>
+              </div>
+              <div className="flex-1 cursor-default rounded-xl border border-[#E8DDD4] bg-white py-2.5 text-center">
+                <div className="text-sm">❓</div>
+                <p className="mt-1 text-[7px] font-semibold" style={{ color: '#78716C' }}>Help</p>
+              </div>
+            </section>
 
-        {/* Stats Row */}
-        {(profile.role === 'contractor' || profile.role === 'worker') && (
-          <section className="mb-6 grid grid-cols-3 gap-3">
-            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-                {avgRating.toFixed(1)}
-              </p>
-              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                Rating
-              </p>
+            <form action={signOutAction} className="mx-4 mt-2.5">
+              <button
+                type="submit"
+                className="w-full rounded-xl border border-[#E8DDD4] py-2.5 text-[10px] font-semibold text-[#78716C] transition-colors hover:bg-[#F2EDE8]"
+              >
+                Sign out
+              </button>
+            </form>
+            <div className="mx-4 mb-6 mt-2">
+              <ProfileAccountActions />
             </div>
-            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-                {projectsCompleted}
-              </p>
-              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                Completed
-              </p>
-            </div>
-            <div className="rounded-lg bg-white p-4 text-center shadow-sm">
-              <p className="text-2xl font-bold" style={{ color: '#D85A30' }}>
-                {profileViewsCount ?? 0}
-              </p>
-              <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                Profile views
-              </p>
-            </div>
-          </section>
-        )}
+          </ProfileEditPanelProvider>
+        ) : (
+          <ProfileEditPanelProvider>
+            <ProfessionalProfileHero
+              name={profile.name}
+              role={profile.role}
+              profilePhotoUrl={profile.profile_photo_url}
+              coverImageUrl={professionalImages[0]?.image_url ?? null}
+              avgRating={avgRating}
+              projectsCompleted={projectsCompleted}
+            />
 
-        {/* Location */}
-        {profile.city ? (
-          <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
-            <p className="mb-2 text-xs font-bold" style={{ color: '#999' }}>
-              LOCATION
-            </p>
-            <p className="text-sm font-medium" style={{ color: '#1A1A1A' }}>
-              {profile.city}
-              {profile.pincode && `, ${profile.pincode}`}
-            </p>
-          </section>
-        ) : null}
+            <section className="flex items-stretch justify-around border-b border-[#E8DDD4] bg-white px-4 py-2.5">
+              <a href="#reviews" className="text-center">
+                <p className="text-base font-extrabold text-[#D85A30]">{avgRating.toFixed(1)}</p>
+                <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>Rating</p>
+              </a>
+              <div className="my-1 w-px self-stretch bg-[#E8DDD4]" />
+              <div className="text-center">
+                <p className="text-base font-extrabold text-[#D85A30]">{projectsCompleted}</p>
+                <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>Done</p>
+              </div>
+              <div className="my-1 w-px self-stretch bg-[#E8DDD4]" />
+              <div className="text-center">
+                <p className="text-base font-extrabold text-[#D85A30]">{profileViewsCount ?? 0}</p>
+                <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>Views</p>
+              </div>
+              <div className="my-1 w-px self-stretch bg-[#E8DDD4]" />
+              <div className="text-center">
+                <p className="text-base font-extrabold text-[#D85A30]">{`${profile.role === 'contractor' ? contractorYearsExperience : workerYearsExperience}y`}</p>
+                <p className="mt-0.5 text-[7px]" style={{ color: '#78716C' }}>Exp</p>
+              </div>
+            </section>
 
-        {/* Trade (Worker) */}
-        {profile.role === 'worker' ? (
-          <>
-            <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
-              <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
-                TRADE
-              </p>
-              {trade ? (
-                <span
-                  className="inline-flex rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-                  style={{ backgroundColor: '#D85A30' }}
+            <section className="flex flex-col gap-3 border-b border-[#E8DDD4] bg-white px-4 py-4">
+              <p className="text-[15px] font-bold leading-snug text-[#2C2C2A]">{`📍 ${profile.city ?? '—'} · ${profile.pincode ?? '—'}`}</p>
+              <p className="text-[15px] font-bold leading-snug text-[#2C2C2A]">{`📞 ${formatPhoneIndian(profile.phone_number)}`}</p>
+              <p className="text-[15px] font-bold leading-snug text-[#2C2C2A]">{`👷 ${profile.role === 'contractor' ? contractorYearsExperience : workerYearsExperience} yrs experience`}</p>
+            </section>
+
+            {((profile.role === 'contractor' && specialisations.length > 0) ||
+              (profile.role === 'worker' && workerSkillTags.length > 0)) ? (
+              <section className="mx-4 mt-3 flex flex-wrap gap-2">
+                {(profile.role === 'contractor' ? specialisations : workerSkillTags).map((item, idx) => (
+                  <span
+                    key={`${item}-${idx}`}
+                    className="rounded-full px-3 py-1.5 text-xs font-bold text-white"
+                    style={{ backgroundColor: '#D85A30' }}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </section>
+            ) : null}
+
+            <ProfileEditFormWithPanel
+              role={profile.role}
+              initialPhotoUrl={profile.profile_photo_url ?? ''}
+              initialCity={profile.city ?? ''}
+              initialPincode={profile.pincode ?? ''}
+              initialYearsExperience={contractorYearsExperience}
+              initialWorkerYearsExperience={workerYearsExperience}
+            />
+
+            <section className="mx-4 mt-3 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white px-3 py-3">
+              <ProfessionalImagesManager
+                initialItems={professionalImages}
+                canEdit
+                galleryHeading="PORTFOLIO"
+                noOuterChrome
+              />
+            </section>
+
+            {profile.role === 'worker' ? (
+              <section className="mx-4 mt-3 flex items-center gap-2 rounded-2xl border border-[#E8DDD4] bg-white px-4 py-3">
+                <span className="text-xs font-semibold text-[#78716C]">Trade:</span>
+                <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-800">{trade ?? 'Not added yet'}</span>
+              </section>
+            ) : null}
+
+            {receivedEnquiriesForDisplay.length > 0 ? (
+              <section id="invitations" className="mx-4 mt-3 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white">
+                <div className="flex items-center justify-between border-b border-[#F2EDE8] px-4 py-3">
+                  <p className="text-[9px] font-bold tracking-widest" style={{ color: '#A8A29E' }}>WORK INVITATIONS</p>
+                  <span className="rounded-full bg-[#FBF0EB] px-2 py-0.5 text-[9px] font-bold text-[#D85A30]">{receivedEnquiriesForDisplay.length}</span>
+                </div>
+                <div
+                  className="pr-1"
+                  style={{ maxHeight: receivedEnquiriesForDisplay.length > 2 ? 320 : undefined, overflowY: receivedEnquiriesForDisplay.length > 2 ? 'auto' : 'visible' }}
                 >
-                  {trade}
-                </span>
-              ) : (
-                <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
-                  Not added yet
+                  {receivedEnquiriesForDisplay.map((invite, index) => {
+                    const parsed = parseInviteSubject(invite.subject)
+                    const senderName = senderMap.get(invite.customer_id) ?? 'Customer'
+                    const isPending = invite.status === 'open'
+                    const statusLabel = isPending ? 'Pending your response' : invite.status === 'responded' ? 'Approved' : 'Declined'
+                    const statusClass = isPending
+                      ? 'bg-amber-50 text-amber-700'
+                      : invite.status === 'responded'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-orange-50 text-orange-700'
+                    return (
+                      <div key={invite.id} className="border-b border-[#F2EDE8] px-4 py-3" style={{ borderBottomWidth: index === receivedEnquiriesForDisplay.length - 1 ? 0 : 1 }}>
+                        <div className="rounded-xl border border-slate-100 bg-white p-3" style={{ borderLeft: `4px solid ${isPending ? '#F59E0B' : invite.status === 'responded' ? '#10B981' : '#FB923C'}` }}>
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>{parsed.projectName}</p>
+                            <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
+                          </div>
+                          <p className="mt-1 text-xs" style={{ color: '#7A6F66' }}>From: {senderName}</p>
+                          {isPending && parsed.projectId ? (
+                            <div className="mt-3">
+                              <InvitationActions projectId={parsed.projectId} />
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            ) : null}
+
+            <section className="mx-4 mt-3 overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white">
+              <div className="flex items-center justify-between border-b border-[#F2EDE8] px-4 py-3">
+                <p className="text-[9px] font-bold tracking-widest" style={{ color: '#A8A29E' }}>PAYMENT APPROVALS</p>
+                {(paymentApprovalRows ?? []).length > 0 ? (
+                  <span className="text-[9px] font-bold text-[#D85A30]">{(paymentApprovalRows ?? []).length}</span>
+                ) : null}
+              </div>
+              {(paymentApprovalRows ?? []).length === 0 ? (
+                <p className="px-4 py-3 text-sm font-medium" style={{ color: '#78716C' }}>
+                  No pending payment approvals.
                 </p>
+              ) : (
+                <div>
+                  {(paymentApprovalRows ?? []).map((payment, index, arr) => (
+                    <div
+                      key={payment.id}
+                      className={`p-3 ${index < arr.length - 1 ? 'border-b border-[#F2EDE8]' : ''}`}
+                    >
+                      <div className="rounded-xl border border-slate-100 bg-white p-3" style={{ borderLeft: '4px solid #F59E0B' }}>
+                        <p className="text-sm font-extrabold" style={{ color: '#2C2C2A' }}>
+                          {paymentProjectNameById.get(payment.project_id) ?? 'Project'}
+                        </p>
+                        <p className="mt-1 text-xs" style={{ color: '#78716C' }}>
+                          {`Amount: ₹${payment.amount.toLocaleString('en-IN')} · ${payment.paid_to_category}`}
+                        </p>
+                        <Link
+                          href={`/projects/${payment.project_id}?tab=payments&paymentId=${payment.id}`}
+                          className="mt-2 inline-flex rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs font-semibold"
+                          style={{ color: '#D85A30' }}
+                        >
+                          Open payments tab
+                        </Link>
+                        <PaymentApprovalActions projectId={payment.project_id} paymentId={payment.id} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </section>
 
-          </>
-        ) : null}
-
-        {(profile.role === 'contractor' || profile.role === 'worker') ? (
-          <section className="mb-4 rounded-lg bg-white p-4 shadow-sm">
-            <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
-              {(profile.role === 'contractor' ? contractorYearsExperience : workerYearsExperience)} years of experience
-            </p>
-          </section>
-        ) : null}
-
-        {(profile.role === 'contractor' || profile.role === 'worker') ? (
-          <ProfessionalImagesManager initialItems={professionalImages} canEdit />
-        ) : null}
-
-        {receivedEnquiriesForDisplay.length > 0 ? (
-          <section id="invitations" className="mb-6 rounded-lg bg-white p-4 shadow-sm">
-            <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
-              WORK INVITATIONS
-            </p>
-            <div
-              className="space-y-3 pr-1"
-              style={{ maxHeight: receivedEnquiriesForDisplay.length > 2 ? 320 : undefined, overflowY: receivedEnquiriesForDisplay.length > 2 ? 'auto' : 'visible' }}
+            <section
+              id="reviews"
+              className="mx-4 mt-3 overflow-hidden rounded-2xl border border-[#E8DDD4]"
+              style={{ backgroundColor: '#F2EDE8' }}
             >
-              {receivedEnquiriesForDisplay.map((invite) => {
-                const parsed = parseInviteSubject(invite.subject)
-                const senderName = senderMap.get(invite.customer_id) ?? 'Customer'
-                const isPending = invite.status === 'open'
-                const statusLabel = isPending ? 'Pending your response' : invite.status === 'responded' ? 'Approved' : 'Declined'
-                const statusClass = isPending
-                  ? 'bg-amber-50 text-amber-700'
-                  : invite.status === 'responded'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-orange-50 text-orange-700'
-                return (
-                  <div
-                    key={invite.id}
-                    className="rounded-xl border border-slate-100 bg-white p-3"
-                    style={{ borderLeft: `4px solid ${isPending ? '#F59E0B' : invite.status === 'responded' ? '#10B981' : '#FB923C'}` }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>{parsed.projectName}</p>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
-                    </div>
-                    <p className="mt-1 text-xs" style={{ color: '#7A6F66' }}>From: {senderName}</p>
-                    {isPending && parsed.projectId ? (
-                      <div className="mt-3">
-                        <InvitationActions projectId={parsed.projectId} />
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        ) : null}
-
-        {sentEnquiriesForDisplay.length > 0 ? (
-          <section className="mb-6 rounded-lg bg-white p-4 shadow-sm">
-            <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
-              INVITATIONS SENT
-            </p>
-            <div
-              className="space-y-3 pr-1"
-              style={{ maxHeight: sentEnquiriesForDisplay.length > 2 ? 320 : undefined, overflowY: sentEnquiriesForDisplay.length > 2 ? 'auto' : 'visible' }}
-            >
-              {sentEnquiriesForDisplay.map((invite) => {
-                const parsed = parseInviteSubject(invite.subject)
-                const recipient = recipientMap.get(invite.recipient_id)
-                const approvedByMembership = approvedInviteMap.get(invite.id) === true
-                const inviteRole = pendingInviteRoleMap.get(invite.id) ?? (recipient?.role === 'worker' ? 'worker' : 'contractor')
-                const roleLabel = inviteRole === 'worker' ? 'Worker' : 'Contractor'
-                const waitingLabel = inviteRole === 'worker' ? 'Waiting worker approval' : 'Waiting contractor approval'
-                const statusLabel =
-                  approvedByMembership || invite.status === 'responded'
-                    ? 'Invitation approved'
-                    : invite.status === 'open'
-                      ? waitingLabel
-                      : 'Declined'
-                const approved = approvedByMembership || invite.status === 'responded'
-                const statusClass = approved
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : invite.status === 'open'
-                    ? 'bg-amber-50 text-amber-700'
-                    : 'bg-orange-50 text-orange-700'
-                return (
-                  <div
-                    key={invite.id}
-                    className="rounded-xl border border-slate-100 bg-white p-3"
-                    style={{ borderLeft: `4px solid ${approved ? '#10B981' : invite.status === 'open' ? '#F59E0B' : '#FB923C'}` }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>{parsed.projectName}</p>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
-                    </div>
-                    <p className="mt-1 text-xs" style={{ color: '#7A6F66' }}>
-                      To: {recipient?.name ?? roleLabel} ({roleLabel})
-                    </p>
-                    {parsed.projectId && approved ? (
-                      <Link
-                        href={
-                          recipient?.role === 'worker'
-                            ? `/projects/${parsed.projectId}?workerDetails=1`
-                            : `/projects/${parsed.projectId}`
-                        }
-                        className="mt-3 inline-flex rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs font-semibold"
-                        style={{ color: '#D85A30' }}
-                      >
-                        {recipient?.role === 'worker' ? 'Open worker details' : 'Open project details'}
-                      </Link>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-        ) : null}
-
-        {(paymentApprovalRows ?? []).length > 0 ? (
-          <section className="mb-6 rounded-lg bg-white p-4 shadow-sm">
-            <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
-              PAYMENT APPROVAL REQUESTS
-            </p>
-            <div className="space-y-3">
-              {(paymentApprovalRows ?? []).map((payment) => (
-                <div
-                  key={payment.id}
-                  className="rounded-xl border border-slate-100 bg-white p-3"
-                  style={{ borderLeft: '4px solid #F59E0B' }}
-                >
-                  <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>
-                    {paymentProjectNameById.get(payment.project_id) ?? 'Project'}
-                  </p>
-                  <p className="mt-1 text-xs" style={{ color: '#7A6F66' }}>
-                    {`Amount: ₹${payment.amount.toLocaleString('en-IN')} · ${payment.paid_to_category}`}
-                  </p>
-                  <Link
-                    href={`/projects/${payment.project_id}?tab=payments&paymentId=${payment.id}`}
-                    className="mt-2 inline-flex rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs font-semibold"
-                    style={{ color: '#D85A30' }}
-                  >
-                    Open payments tab
-                  </Link>
-                  <PaymentApprovalActions projectId={payment.project_id} paymentId={payment.id} />
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {(profile.role === 'contractor' || profile.role === 'worker') ? (
-          <section id="reviews" className="mb-6 rounded-lg bg-white p-4 shadow-sm">
-            <p className="mb-3 text-xs font-bold" style={{ color: '#999' }}>
-              REVIEWS
-            </p>
-            {reviewRows.length === 0 ? (
-              <p className="text-sm font-medium" style={{ color: '#7A6F66' }}>
-                No reviews yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {reviewRows.map((review) => (
-                  <div
-                    key={review.id}
-                    className="rounded-xl border border-slate-100 bg-white p-3"
-                    style={{ borderLeft: '4px solid #D85A30' }}
-                  >
-                    <p className="text-sm font-semibold" style={{ color: '#1A1A1A' }}>
-                      {reviewedProjectNameById.get(review.project_id) ?? 'Project'}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold" style={{ color: '#B45309' }}>
-                      {`★ ${Number(review.rating).toFixed(1)} · by ${reviewerNameById.get(review.reviewer_id) ?? 'Customer'}`}
-                    </p>
-                    {review.comment ? (
-                      <p className="mt-2 text-xs" style={{ color: '#7A6F66' }}>
-                        {review.comment}
-                      </p>
-                    ) : (
-                      <p className="mt-2 text-xs" style={{ color: '#9CA3AF' }}>
-                        No written comment
-                      </p>
-                    )}
-                  </div>
-                ))}
+              <div className="flex items-center justify-between border-b border-[#E8DDD4]/80 px-4 py-3">
+                <p className="text-[11px] font-extrabold tracking-[0.06em]" style={{ color: '#57534E' }}>
+                  REVIEWS
+                </p>
+                <span className="text-[11px] font-bold text-[#D85A30]">{formatReviewsSectionCount(reviewRows.length)}</span>
               </div>
-            )}
-          </section>
-        ) : null}
+              {reviewRows.length === 0 ? (
+                <p className="px-4 py-4 text-sm font-medium" style={{ color: '#78716C' }}>
+                  No reviews yet.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2 px-2.5 pb-3 pt-2">
+                  <ConceptBReviewCards
+                    reviews={reviewRows}
+                    reviewerNameById={Object.fromEntries(reviewerNameById)}
+                  />
+                </div>
+              )}
+            </section>
 
-        {/* Sign Out Button */}
-        <form action={signOutAction} className="mb-2">
-          <button
-            type="submit"
-            className="w-full rounded-lg px-4 py-3 text-sm font-semibold transition-colors hover:bg-red-50"
-            style={{
-              border: '2px solid #EF4444',
-              color: '#EF4444',
-            }}
-          >
-            Sign Out
-          </button>
-        </form>
-        <div className="mb-6">
-          <ProfileAccountActions />
-        </div>
+            <section className="mx-4 mt-3.5 mb-6 flex gap-2">
+              <form action={signOutAction} className="flex-1">
+                <button
+                  type="submit"
+                  className="w-full rounded-xl border border-[#E8DDD4] py-2.5 text-[10px] font-semibold text-[#78716C] transition-colors hover:bg-[#F2EDE8]"
+                >
+                  Sign out
+                </button>
+              </form>
+              <div className="flex-1">
+                <ProfileAccountActions />
+              </div>
+            </section>
+          </ProfileEditPanelProvider>
+        )}
       </div>
 
       <BottomNav />

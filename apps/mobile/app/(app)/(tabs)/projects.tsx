@@ -223,7 +223,7 @@ export default function ProjectsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color="#D85A30" />
         </View>

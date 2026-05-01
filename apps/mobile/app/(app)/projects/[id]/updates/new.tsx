@@ -172,7 +172,7 @@ export default function PostUpdateScreen() {
 
   if (!authChecked) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#D85A30" />
         </View>
@@ -182,7 +182,7 @@ export default function PostUpdateScreen() {
 
   if (!allowed) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right']}>
         <View style={{ padding: 16 }}>
           <Text style={{ color: '#6B7280' }}>Access denied</Text>
         </View>
@@ -193,7 +193,7 @@ export default function PostUpdateScreen() {
   const BRAND = '#D85A30'
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['left', 'right']}>
       <KeyboardSafeView includeTopSafeArea={false} iosHeaderOffset={52}>
         <View
           style={{

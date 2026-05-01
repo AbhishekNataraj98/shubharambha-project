@@ -103,7 +103,7 @@ export default function LoginScreen() {
   const otpValid = otp.length === 6
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <KeyboardSafeView style={styles.flex} includeTopSafeArea={false}>
         <ScrollView
           contentContainerStyle={styles.scroll}

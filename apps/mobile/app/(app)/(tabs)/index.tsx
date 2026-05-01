@@ -215,7 +215,7 @@ export default function DashboardScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#D85A30" />
         </View>
