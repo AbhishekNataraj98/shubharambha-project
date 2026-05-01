@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { BlobProvider, Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import {
@@ -93,13 +93,6 @@ const pdfStyles = StyleSheet.create({
   cell: { flex: 1 },
 })
 
-function statusStyle(status: 'paid' | 'partial' | 'due' | 'upcoming') {
-  if (status === 'paid') return 'border-l-green-500 bg-green-50'
-  if (status === 'partial') return 'border-l-amber-500 bg-amber-50'
-  if (status === 'due') return 'border-l-orange-500 bg-orange-50'
-  return 'border-l-gray-300 bg-gray-50'
-}
-
 export default function ProjectReports({ projectId }: { projectId: string; currentUserRole: string }) {
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -111,7 +104,7 @@ export default function ProjectReports({ projectId }: { projectId: string; curre
   const [steelRate, setSteelRate] = useState('')
   const [autoExportTriggered, setAutoExportTriggered] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [reportsRes, setupRes] = await Promise.all([
@@ -129,11 +122,14 @@ export default function ProjectReports({ projectId }: { projectId: string; curre
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
 
   useEffect(() => {
-    void load()
-  }, [projectId])
+    const timer = window.setTimeout(() => {
+      void load()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const chartMerged = useMemo(() => {
     const est = reports?.chartData?.estimated ?? []
@@ -224,16 +220,32 @@ export default function ProjectReports({ projectId }: { projectId: string; curre
   if (!overview) return null
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="space-y-4 bg-[#F2EDE8] pb-6">
       <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-white p-3"><p className="text-xs text-gray-500">Total contract value</p><p className="text-lg font-bold">{inr.format(overview.totalContractAmount)}</p></div>
-        <div className="rounded-xl bg-blue-50 p-3"><p className="text-xs text-blue-700">Expected by this stage</p><p className="text-lg font-bold text-blue-800">{inr.format(overview.totalEstimatedSoFar)}</p><p className="text-[11px] text-blue-500">based on payment schedule</p></div>
-        <div className="rounded-xl bg-orange-50 p-3"><p className="text-xs text-orange-700">Actually paid so far</p><p className="text-lg font-bold text-orange-800">{inr.format(overview.totalActualSpent)}</p></div>
-        <div className={`rounded-xl p-3 ${overview.variance >= 0 ? 'bg-green-50' : 'bg-red-50'}`}><p className="text-xs">{overview.variance >= 0 ? 'Under budget' : 'Over budget'}</p><p className="text-lg font-bold">{inr.format(Math.abs(overview.variance))}</p><p className="text-[11px]">{inr.format(Math.abs(overview.variance))} {overview.varianceLabel}</p></div>
+        <div className="rounded-[14px] border border-[#E8DDD4] bg-[#F2EDE8] p-3">
+          <p className="mb-1 text-xl">📋</p>
+          <p className="text-[10px] text-[#78716C]">Total Contract</p>
+          <p className="text-lg font-extrabold text-[#2C2C2A]">{inr.format(overview.totalContractAmount)}</p>
+        </div>
+        <div className="rounded-[14px] border border-[#E8DDD4] bg-[#EFF6FF] p-3">
+          <p className="mb-1 text-xl">📐</p>
+          <p className="text-[10px] text-[#78716C]">Estimated Spent</p>
+          <p className="text-lg font-extrabold text-[#1D4ED8]">{inr.format(overview.totalEstimatedSoFar)}</p>
+        </div>
+        <div className="rounded-[14px] border border-[#E8DDD4] bg-[#FBF0EB] p-3">
+          <p className="mb-1 text-xl">💸</p>
+          <p className="text-[10px] text-[#78716C]">Actual Spent</p>
+          <p className="text-lg font-extrabold text-[#D85A30]">{inr.format(overview.totalActualSpent)}</p>
+        </div>
+        <div className={`rounded-[14px] border border-[#E8DDD4] p-3 ${overview.variance >= 0 ? 'bg-[#F0FDF4]' : 'bg-[#FEF2F2]'}`}>
+          <p className="mb-1 text-xl">{overview.variance >= 0 ? '✅' : '⚠️'}</p>
+          <p className="text-[10px] text-[#78716C]">Variance</p>
+          <p className={`text-lg font-extrabold ${overview.variance >= 0 ? 'text-[#166534]' : 'text-[#DC2626]'}`}>{inr.format(Math.abs(overview.variance))}</p>
+        </div>
       </section>
 
-      <section className="rounded-xl bg-white p-3">
-        <h4 className="mb-2 font-semibold text-gray-900">Estimated vs Actual Spending</h4>
+      <section className="rounded-[14px] border border-[#E8DDD4] bg-white p-3">
+        <h4 className="mb-2 text-[11px] font-bold text-[#2C2C2A]">Estimated vs Actual Spending</h4>
         <div className="h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartMerged}>
@@ -251,17 +263,38 @@ export default function ProjectReports({ projectId }: { projectId: string; curre
         </div>
       </section>
 
-      <section className="rounded-xl bg-white p-3">
-        <h4 className="mb-2 font-semibold text-gray-900">Stage-wise Payment Tracker</h4>
+      <section className="overflow-hidden rounded-[14px] border border-[#E8DDD4] bg-white">
+        <div className="border-b border-[#F2EDE8] px-3.5 py-2.5">
+          <h4 className="text-[11px] font-bold text-[#2C2C2A]">📊 Stage Payments</h4>
+        </div>
         <div className="space-y-2">
           {(reports.stagePayments ?? []).map((row) => (
-            <div key={row.stage} className={`rounded-lg border-l-4 p-3 ${statusStyle(row.status)}`}>
+            <div key={row.stage} className={`mx-3 border-b border-[#F2EDE8] py-2.5`}>
               <div className="flex items-center justify-between">
-                <p className="font-semibold text-gray-900">{row.label}</p>
-                <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-medium capitalize">{row.status}</span>
+                <p className="text-[11px] font-semibold text-[#2C2C2A]">{row.label}</p>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    row.status === 'paid'
+                      ? 'bg-[#DCFCE7] text-[#166534]'
+                      : row.status === 'due'
+                        ? 'bg-[#FEF3C7] text-[#92400E]'
+                        : row.status === 'partial'
+                          ? 'bg-[#FEF3C7] text-[#92400E]'
+                          : 'bg-[#F2EDE8] text-[#A8A29E]'
+                  }`}
+                >
+                  {row.status === 'paid'
+                    ? '✓ Paid'
+                    : row.status === 'due'
+                      ? '⏳ Due'
+                      : row.status === 'partial'
+                        ? '⚠️ Partial'
+                        : '🔒 Upcoming'}
+                </span>
               </div>
-              <p className="text-xs text-gray-500">Expected: {inr.format(row.expectedAmount)}</p>
-              <p className="text-sm text-gray-700">Actual: {inr.format(row.actualPaidAmount)}</p>
+              <p className="mt-0.5 text-[9px] text-[#A8A29E]">
+                {`${Math.round((row.expectedAmount / Math.max(overview.totalContractAmount, 1)) * 100)}% · ${inr.format(row.expectedAmount)}`}
+              </p>
             </div>
           ))}
         </div>

@@ -53,7 +53,7 @@ function formatCurrency(value: number) {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function monthLabel(value: string) {
@@ -65,6 +65,25 @@ function categoryVisual(category: PaymentItem['paidToCategory']) {
   if (category === 'material') return { label: 'Material Payment', badge: 'M', className: 'bg-green-100 text-green-600' }
   if (category === 'contractor_fee') return { label: 'Contractor Payment', badge: 'C', className: 'bg-orange-100 text-orange-600' }
   return { label: 'Other Payment', badge: 'O', className: 'bg-gray-100 text-gray-600' }
+}
+
+function statusAccentColor(status: string): string {
+  if (status === 'confirmed') return '#10B981'
+  if (status === 'pending_confirmation') return '#F59E0B'
+  if (status === 'declined' || status === 'rejected') return '#EF4444'
+  return '#E8DDD4'
+}
+
+function categoryEmoji(category: string): string {
+  const map: Record<string, string> = {
+    labour: '👷',
+    labor: '👷',
+    material: '🧱',
+    materials: '🧱',
+    contractor_fee: '🏗️',
+    other: '📦',
+  }
+  return map[category?.toLowerCase()] ?? '💳'
 }
 
 function modeLabel(mode: PaymentItem['paymentMode']) {
@@ -229,28 +248,26 @@ export default function PaymentPanel({
   }, [focusPaymentId, groupedByMonth.length])
 
   return (
-    <div className="space-y-3 pb-24">
-      <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 px-4 py-3.5 text-white shadow-lg">
-        <p className="text-[11px] uppercase tracking-wide text-gray-400">Total Paid</p>
-        <p className="mt-0.5 text-2xl font-bold">{formatCurrency(summary.confirmed)}</p>
-        <div className="my-2 border-t border-gray-700" />
-        <div className="grid grid-cols-2 gap-2">
+    <div className="space-y-3 bg-[#F2EDE8] pb-24">
+      <div className="rounded-2xl bg-[#2C2C2A] px-3 py-2.5 text-white shadow-sm">
+        <div className="flex items-end justify-between gap-2">
           <div>
-            <p className="inline-flex items-center gap-1 text-[11px] text-gray-400">
-              <CheckCircle2 className="h-3 w-3" /> Confirmed
-            </p>
-            <p className="text-[13px] font-semibold text-emerald-400">{formatCurrency(summary.confirmed)}</p>
+            <p className="text-[8px] uppercase tracking-[0.08em] text-white/40">TOTAL CONFIRMED</p>
+            <p className="mt-0.5 text-xl font-extrabold">{formatCurrency(summary.confirmed)}</p>
+            <p className="text-[8px] text-[#10B981]">✓ {counts.confirmed} confirmed</p>
           </div>
-          <div>
-            <p className="inline-flex items-center gap-1 text-[11px] text-gray-400">
-              <Clock3 className="h-3 w-3" /> Pending
-            </p>
-            <p className="text-[13px] font-semibold text-amber-400">{formatCurrency(summary.pending)}</p>
+          <div className="text-right">
+            <p className="text-[11px] font-bold text-[#F59E0B]">{formatCurrency(summary.pending)}</p>
+            <p className="text-[8px] text-white/45">Pending</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] font-bold text-[#EF4444]">{formatCurrency(summary.declined)}</p>
+            <p className="text-[8px] text-white/45">Declined</p>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
         {filterPills.map((pill) => {
           const active = filter === pill.id
           return (
@@ -258,10 +275,10 @@ export default function PaymentPanel({
               key={pill.id}
               type="button"
               onClick={() => setFilter(pill.id)}
-              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs ${
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[10px] ${
                 active
-                  ? 'bg-orange-500 text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-600 transition hover:bg-gray-200 active:scale-[0.98]'
+                  ? 'bg-[#D85A30] text-white shadow-sm'
+                  : 'border border-[#E8DDD4] bg-white text-[#78716C] transition hover:bg-gray-50 active:scale-[0.98]'
               }`}
             >
               <span>{pill.label}</span>
@@ -311,40 +328,25 @@ export default function PaymentPanel({
                       ? 'contractor'
                       : 'professional'
 
-                const wrapperClass = isPending
-                  ? professionalNeedsAction
-                    ? 'rounded-2xl border-2 border-orange-200 bg-white p-4 shadow-sm transition hover:shadow-md'
-                    : 'rounded-2xl border border-amber-200 bg-amber-50 p-4'
-                  : isDeclined
-                    ? 'rounded-2xl border border-red-100 bg-red-50 p-4'
-                    : 'rounded-2xl border border-gray-100 bg-white p-4 transition hover:shadow-sm'
-
-                const accentClass = isPending
-                  ? professionalNeedsAction
-                    ? 'border-orange-400'
-                    : 'border-amber-400'
-                  : isDeclined
-                    ? 'border-red-400'
-                    : 'border-emerald-400'
-
                 return (
                   <div
                     key={payment.id}
                     id={`payment-card-${payment.id}`}
-                    className={`${wrapperClass} border-l-4 ${accentClass} relative ${
+                    className={`relative overflow-hidden rounded-2xl border border-[#E8DDD4] bg-white p-3 ${
                       focusPaymentId === payment.id ? 'ring-2 ring-orange-300 ring-offset-2' : ''
                     }`}
+                    style={{ borderLeftWidth: 3, borderLeftColor: statusAccentColor(payment.status) }}
                   >
                     {professionalNeedsAction ? (
                       <span className="absolute top-3 right-3 h-2.5 w-2.5 animate-pulse rounded-full bg-amber-400" />
                     ) : null}
                     <div className="flex items-start gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${visual.className}`}>
-                        {visual.badge}
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FBF0EB] text-base">
+                        {categoryEmoji(payment.paidToCategory)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
-                          <p className="truncate text-sm font-semibold text-gray-900">
+                          <p className="truncate text-xs font-bold text-[#2C2C2A]">
                             {professionalNeedsAction ? (
                               <span className="inline-flex items-center gap-1">
                                 <BellRing className="h-3.5 w-3.5 text-amber-500" />
@@ -354,16 +356,16 @@ export default function PaymentPanel({
                               visual.label
                             )}
                           </p>
-                          <p className="text-lg font-bold text-gray-900">{formatCurrency(payment.amount)}</p>
+                          <p className="text-[15px] font-extrabold text-[#2C2C2A]">{formatCurrency(payment.amount)}</p>
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">
+                        <p className="mt-1 text-[10px] text-[#A8A29E]">
                           {professionalNeedsAction ? `Recorded by: ${payment.recordedByName}` : `Paid to: ${payment.paidToName}`}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-[10px] text-[#A8A29E]">
                           Via: {modeLabel(payment.paymentMode)} · {formatDate(payment.paidAt)}
                         </p>
                         {payment.description ? (
-                          <p className="mt-1 text-sm italic text-gray-600">&quot;{payment.description}&quot;</p>
+                          <p className="mt-2 pl-1 text-[11px] italic text-[#78716C]">&quot;{payment.description}&quot;</p>
                         ) : null}
 
                         {isPending && !professionalNeedsAction ? (

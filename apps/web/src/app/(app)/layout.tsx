@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { Toaster } from 'sonner'
 import AppTopHeader from '@/components/shared/AppTopHeader'
 
 export default async function AppGroupLayout({
@@ -15,6 +16,7 @@ export default async function AppGroupLayout({
     <div className="min-h-screen bg-[#F2EDE8]">
       <AppTopHeader userId={user?.id ?? null} />
       <div>{children}</div>
+      <Toaster richColors position="top-center" />
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { router } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 
@@ -29,6 +30,9 @@ type Project = {
   customer_id: string
   contractor_id: string | null
   updated_at: string
+  contractorName?: string
+  workerName?: string
+  customerName?: string
 }
 
 type TabFilter = 'all' | 'active' | 'pending' | 'completed'
@@ -56,6 +60,7 @@ function awaitingLabel(project: Project) {
   return project.contractor_id ? 'Waiting contractor approval' : 'Waiting worker approval'
 }
 
+/** Legacy stage accents; hero cards use STAGE_GRADIENTS. Kept for parity with shared stage keys. */
 const STAGE_COLORS: Record<string, { bg: string; text: string }> = {
   foundation: { bg: '#F1F5F9', text: '#475569' },
   plinth: { bg: '#EFF6FF', text: '#1D4ED8' },
@@ -65,12 +70,367 @@ const STAGE_COLORS: Record<string, { bg: string; text: string }> = {
   finishing: { bg: '#ECFDF5', text: '#065F46' },
 }
 
+type GradientStop = { from: string; mid: string; to: string }
+
+const STAGE_GRADIENTS: Record<string, GradientStop> = {
+  foundation: {
+    from: '#4A3828',
+    mid: '#6B4A30',
+    to: '#8C6040',
+  },
+  plinth: {
+    from: '#1A2744',
+    mid: '#1E3A5F',
+    to: '#2563EB',
+  },
+  walls: {
+    from: '#3D2A10',
+    mid: '#7C4A14',
+    to: '#B45309',
+  },
+  slab: {
+    from: '#2D1B4E',
+    mid: '#4C2D7A',
+    to: '#7C3AED',
+  },
+  plastering: {
+    from: '#0D2A2A',
+    mid: '#1A4A3A',
+    to: '#0D9488',
+  },
+  finishing: {
+    from: '#14291A',
+    mid: '#1A4A28',
+    to: '#16A34A',
+  },
+}
+
+const DEFAULT_GRADIENT: GradientStop = {
+  from: '#2C2C2A',
+  mid: '#3D2A20',
+  to: '#D85A30',
+}
+
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const days = Math.floor(diff / 86400000)
   if (days === 0) return '0 days ago'
   if (days === 1) return '1 day ago'
   return `${days} days ago`
+}
+
+type MemberRow = { project_id: string; user_id: string; role: string | null }
+
+async function attachContractorNames(projectList: Project[]): Promise<Project[]> {
+  const contractorIds = Array.from(
+    new Set(projectList.map((p) => p.contractor_id).filter(Boolean) as string[])
+  )
+  if (contractorIds.length === 0) return projectList
+  const { data: contractorUsers } = await supabase.from('users').select('id,name').in('id', contractorIds)
+  const rows = (contractorUsers ?? []) as Array<{ id: string; name: string }>
+  const nameById = new Map(rows.map((u) => [u.id, u.name]))
+  return projectList.map((p) => ({
+    ...p,
+    contractorName: p.contractor_id ? (nameById.get(p.contractor_id) ?? undefined) : undefined,
+  }))
+}
+
+async function attachWorkerNamesWhenNoContractor(projectList: Project[], memberRows: MemberRow[]): Promise<Project[]> {
+  const needsWorker = new Set(projectList.filter((p) => !p.contractor_id).map((p) => p.id))
+  const workerIdByProject = new Map<string, string>()
+  for (const row of memberRows) {
+    if (row.role !== 'worker' || !needsWorker.has(row.project_id)) continue
+    if (!workerIdByProject.has(row.project_id)) workerIdByProject.set(row.project_id, row.user_id)
+  }
+  const workerIds = Array.from(new Set(workerIdByProject.values()))
+  if (workerIds.length === 0) return projectList
+  const { data: workerUsers } = await supabase.from('users').select('id,name').in('id', workerIds)
+  const nameById = new Map((workerUsers ?? []).map((u) => [u.id as string, u.name as string]))
+  return projectList.map((p) => {
+    if (p.contractor_id) return p
+    const wid = workerIdByProject.get(p.id)
+    const workerName = wid ? nameById.get(wid) : undefined
+    return workerName ? { ...p, workerName } : p
+  })
+}
+
+async function attachCustomerNames(projectList: Project[]): Promise<Project[]> {
+  const customerIds = Array.from(new Set(projectList.map((p) => p.customer_id).filter(Boolean)))
+  if (customerIds.length === 0) return projectList
+  const { data: customerUsers } = await supabase.from('users').select('id,name').in('id', customerIds)
+  const rows = (customerUsers ?? []) as Array<{ id: string; name: string }>
+  const nameById = new Map(rows.map((u) => [u.id, u.name]))
+  return projectList.map((p) => ({
+    ...p,
+    customerName: nameById.get(p.customer_id) ?? undefined,
+  }))
+}
+
+function titleRowParty(item: Project, isCustomer: boolean): { emoji: string; name: string } | null {
+  if (isCustomer) {
+    if (item.contractorName) return { emoji: '👷', name: item.contractorName }
+    if (item.workerName) return { emoji: '🛠️', name: item.workerName }
+    return null
+  }
+  if (item.customerName) return { emoji: '👤', name: item.customerName }
+  return null
+}
+
+function HeroProjectCard({
+  item,
+  isCustomer,
+  projectHasWorker: _projectHasWorker,
+  projectHasAcceptedProfessional,
+  onPress,
+}: {
+  item: Project
+  isCustomer: boolean
+  projectHasWorker: Map<string, boolean>
+  projectHasAcceptedProfessional: Map<string, boolean>
+  onPress: () => void
+}) {
+  const effectiveStatus =
+    (item.status === 'pending' || item.status === 'on_hold') &&
+    (!isCustomer || projectHasAcceptedProfessional.get(item.id) === true)
+      ? 'active'
+      : item.status
+
+  const statusCfg = STATUS_CONFIG[effectiveStatus] ?? STATUS_CONFIG.active
+
+  const statusLabel =
+    effectiveStatus === 'pending' || effectiveStatus === 'on_hold' ? awaitingLabel(item) : statusCfg.label
+
+  const progress = STAGE_PROGRESS[item.current_stage] ?? 10
+  const grad = STAGE_GRADIENTS[item.current_stage] ?? DEFAULT_GRADIENT
+
+  const stageLabel = item.current_stage.charAt(0).toUpperCase() + item.current_stage.slice(1)
+
+  const stageEmoji: Record<string, string> = {
+    foundation: '⛏️',
+    plinth: '🏗️',
+    walls: '🧱',
+    slab: '🪨',
+    plastering: '🖌️',
+    finishing: '✨',
+  }
+  const emoji = stageEmoji[item.current_stage] ?? '🏗️'
+
+  const statusDot: Record<string, string> = {
+    active: '#10B981',
+    pending: '#F59E0B',
+    on_hold: '#F59E0B',
+    completed: '#A8A29E',
+    cancelled: '#EF4444',
+  }
+  const dotColor = statusDot[effectiveStatus] ?? '#A8A29E'
+
+  const party = titleRowParty(item, isCustomer)
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.88}
+      style={{
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginBottom: 12,
+        height: 158,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+        elevation: 6,
+      }}
+    >
+      <LinearGradient colors={[grad.from, grad.mid, grad.to]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.28)',
+            padding: 14,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              marginBottom: 'auto',
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                borderWidth: 0.5,
+                borderColor: 'rgba(255,255,255,0.3)',
+                borderRadius: 20,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Text style={{ fontSize: 10 }}>{emoji}</Text>
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: '700',
+                  color: '#FFFFFF',
+                }}
+              >
+                {stageLabel}
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                marginBottom: 3,
+              }}
+            >
+              <Text
+                style={{
+                  flexGrow: 1,
+                  flexShrink: 1,
+                  flexBasis: 0,
+                  minWidth: 0,
+                  fontSize: 18,
+                  fontWeight: '800',
+                  color: '#FFFFFF',
+                  letterSpacing: -0.3,
+                }}
+                numberOfLines={1}
+              >
+                {item.name}
+              </Text>
+              {party ? (
+                <View style={{ flexShrink: 0, maxWidth: 152, marginLeft: 6 }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '700',
+                      color: 'rgba(255,255,255,0.95)',
+                      textAlign: 'right',
+                    }}
+                    numberOfLines={1}
+                  >
+                    {party.emoji} {party.name}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 10,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: 'rgba(255,255,255,0.7)',
+                }}
+              >
+                📍 {item.city}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  height: 4,
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <View
+                  style={{
+                    height: 4,
+                    width: `${progress}%`,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 2,
+                  }}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: 'rgba(255,255,255,0.9)',
+                  minWidth: 32,
+                }}
+              >
+                {progress}%
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  backgroundColor: 'rgba(0,0,0,0.3)',
+                  borderRadius: 20,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: dotColor,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {statusLabel}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: 'rgba(255,255,255,0.6)',
+                }}
+              >
+                {relativeTime(item.updated_at)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  )
 }
 
 export default function ProjectsScreen() {
@@ -93,11 +453,7 @@ export default function ProjectsScreen() {
       return
     }
 
-    const { data: prof } = await supabase
-      .from('users')
-      .select('id,name,role')
-      .eq('id', user.id)
-      .maybeSingle()
+    const { data: prof } = await supabase.from('users').select('id,name,role').eq('id', user.id).maybeSingle()
 
     if (!prof) {
       router.replace('/(auth)/register')
@@ -114,12 +470,10 @@ export default function ProjectsScreen() {
       const ownedProjects = (owned ?? []) as Project[]
       const projectIds = ownedProjects.map((p) => p.id)
       let approvedProjects = ownedProjects
+      let memberRows: MemberRow[] = []
       if (projectIds.length > 0) {
-        const { data: members } = await supabase
-          .from('project_members')
-          .select('project_id,user_id,role')
-          .in('project_id', projectIds)
-        const memberRows = (members ?? []) as Array<{ project_id: string; user_id: string; role: string | null }>
+        const { data: members } = await supabase.from('project_members').select('project_id,user_id,role').in('project_id', projectIds)
+        memberRows = (members ?? []) as MemberRow[]
         const acceptedProfessionalMap = new Map<string, boolean>()
         for (const member of memberRows) {
           if (member.user_id !== user.id && (member.role === 'worker' || member.role === 'contractor')) {
@@ -134,14 +488,12 @@ export default function ProjectsScreen() {
           return memberRows.some((m) => m.project_id === project.id && m.role === 'worker')
         })
       }
-      setProjects(approvedProjects)
+      let enriched = await attachContractorNames(approvedProjects)
+      enriched = await attachWorkerNamesWhenNoContractor(enriched, memberRows)
+      setProjects(enriched)
       const approvedIds = approvedProjects.map((p) => p.id)
       if (approvedIds.length > 0) {
-        const { data: workerRows } = await supabase
-          .from('project_members')
-          .select('project_id')
-          .in('project_id', approvedIds)
-          .eq('role', 'worker')
+        const { data: workerRows } = await supabase.from('project_members').select('project_id').in('project_id', approvedIds).eq('role', 'worker')
         setProjectHasWorker(new Map((workerRows ?? []).map((row) => [row.project_id, true])))
       } else {
         setProjectHasWorker(new Map())
@@ -155,14 +507,11 @@ export default function ProjectsScreen() {
         .in('status', ['active', 'completed'])
         .order('updated_at', { ascending: false })
       const contractorProjects = (proj ?? []) as Project[]
-      setProjects(contractorProjects)
+      const withCustomer = await attachCustomerNames(contractorProjects)
+      setProjects(withCustomer)
       const ids = contractorProjects.map((p) => p.id)
       if (ids.length > 0) {
-        const { data: workerRows } = await supabase
-          .from('project_members')
-          .select('project_id')
-          .in('project_id', ids)
-          .eq('role', 'worker')
+        const { data: workerRows } = await supabase.from('project_members').select('project_id').in('project_id', ids).eq('role', 'worker')
         setProjectHasWorker(new Map((workerRows ?? []).map((row) => [row.project_id, true])))
         setProjectHasAcceptedProfessional(new Map(ids.map((projectId) => [projectId, true])))
       } else {
@@ -179,7 +528,8 @@ export default function ProjectsScreen() {
           .in('id', ids)
           .order('updated_at', { ascending: false })
         const workerProjects = (proj ?? []) as Project[]
-        setProjects(workerProjects)
+        const withCustomer = await attachCustomerNames(workerProjects)
+        setProjects(withCustomer)
         const workerProjectIds = workerProjects.map((p) => p.id)
         setProjectHasWorker(new Map(workerProjectIds.map((projectId) => [projectId, true])))
         setProjectHasAcceptedProfessional(new Map(workerProjectIds.map((projectId) => [projectId, true])))
@@ -204,13 +554,12 @@ export default function ProjectsScreen() {
 
   const goToNewProject = useCallback(() => {
     console.log('[navigation] projects FAB + -> /projects/new')
-    router.push('/projects/new' as any)
+    router.push('/projects/new' as const)
   }, [])
 
   const filteredProjects = useMemo(() => {
     const effectiveStatus = (project: Project) =>
-      (project.status === 'pending' || project.status === 'on_hold') &&
-      projectHasAcceptedProfessional.get(project.id) === true
+      (project.status === 'pending' || project.status === 'on_hold') && projectHasAcceptedProfessional.get(project.id) === true
         ? 'active'
         : project.status
 
@@ -223,7 +572,7 @@ export default function ProjectsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safe} edges={['left', 'right']}>
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color="#D85A30" />
         </View>
@@ -240,81 +589,213 @@ export default function ProjectsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#D85A30" colors={['#D85A30']} />}
         ListHeaderComponent={
           <View>
-            <Text style={styles.sectionTitle}>My Projects</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              {FILTERS.map((item) => {
-                const active = filter === item
-                return (
-                  <TouchableOpacity
-                    key={item}
-                    onPress={() => setFilter(item)}
-                    style={[styles.filterBtn, active ? styles.filterBtnActive : styles.filterBtnInactive]}
+            <View
+              style={{
+                marginBottom: 14,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-end',
+                  marginBottom: 12,
+                }}
+              >
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 26,
+                      fontWeight: '800',
+                      color: '#2C2C2A',
+                      letterSpacing: -0.5,
+                    }}
                   >
-                    <Text style={[styles.filterText, active ? styles.filterTextActive : styles.filterTextInactive]}>
-                      {item.charAt(0).toUpperCase() + item.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </ScrollView>
+                    My Projects
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: '#A8A29E',
+                      marginTop: 2,
+                    }}
+                  >
+                    {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  flexDirection: 'row',
+                  gap: 7,
+                  paddingBottom: 2,
+                }}
+              >
+                {FILTERS.map((item) => {
+                  const active = filter === item
+                  const count = projects.filter((p) => {
+                    if (item === 'all') return true
+                    const eff =
+                      (p.status === 'pending' || p.status === 'on_hold') &&
+                      (!isCustomer || projectHasAcceptedProfessional.get(p.id) === true)
+                        ? 'active'
+                        : p.status
+                    if (item === 'pending') return eff === 'pending' || eff === 'on_hold'
+                    return eff === item
+                  }).length
+
+                  return (
+                    <TouchableOpacity
+                      key={item}
+                      onPress={() => setFilter(item)}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        backgroundColor: active ? '#2C2C2A' : '#FFFFFF',
+                        borderWidth: 0.5,
+                        borderColor: active ? '#2C2C2A' : '#E8DDD4',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: active ? '#FFFFFF' : '#78716C',
+                        }}
+                      >
+                        {item.charAt(0).toUpperCase() + item.slice(1)}
+                      </Text>
+                      {count > 0 ? (
+                        <View
+                          style={{
+                            backgroundColor: active ? '#D85A30' : '#F2EDE8',
+                            borderRadius: 10,
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                            minWidth: 18,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              fontWeight: '700',
+                              color: active ? '#FFFFFF' : '#78716C',
+                            }}
+                          >
+                            {count}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  )
+                })}
+              </ScrollView>
+            </View>
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📁</Text>
-            <Text style={styles.emptyTitle}>No projects yet</Text>
-            <Text style={styles.emptySubtitle}>
+          <View
+            style={{
+              alignItems: 'center',
+              paddingVertical: 56,
+              borderRadius: 20,
+              overflow: 'hidden',
+            }}
+          >
+            <LinearGradient
+              colors={['#2C2C2A', '#3D2A20', '#D85A30']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 14,
+              }}
+            >
+              <Text style={{ fontSize: 32 }}>🏗️</Text>
+            </LinearGradient>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '800',
+                color: '#2C2C2A',
+                marginBottom: 8,
+              }}
+            >
+              No projects yet
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: '#78716C',
+                textAlign: 'center',
+                paddingHorizontal: 32,
+                lineHeight: 20,
+              }}
+            >
               {isCustomer ? 'Tap + to create your first project' : 'You will see projects here once invited'}
             </Text>
           </View>
         }
-        renderItem={({ item }) => {
-          const effectiveStatus =
-            (item.status === 'pending' || item.status === 'on_hold') &&
-            (!isCustomer || projectHasAcceptedProfessional.get(item.id) === true)
-              ? 'active'
-              : item.status
-          const status = STATUS_CONFIG[effectiveStatus] ?? STATUS_CONFIG.active
-          const statusLabel =
-            effectiveStatus === 'pending' || effectiveStatus === 'on_hold' ? awaitingLabel(item) : status.label
-          const hideStagePill = projectHasWorker.get(item.id) === true
-          const stage = STAGE_COLORS[item.current_stage] ?? STAGE_COLORS.foundation
-          const progress = STAGE_PROGRESS[item.current_stage] ?? 10
-
-          return (
-            <TouchableOpacity
-              style={[styles.projectCard, { borderLeftColor: status.border }]}
-              onPress={() => router.push({ pathname: '/projects/[id]', params: { id: item.id } })}
-              activeOpacity={0.8}
-            >
-              <View style={styles.projectCardTop}>
-                <Text style={styles.projectName} numberOfLines={1}>{item.name}</Text>
-                {!hideStagePill ? (
-                  <View style={[styles.stagePill, { backgroundColor: stage.bg }]}>
-                    <Text style={[styles.stagePillText, { color: stage.text }]}>{item.current_stage}</Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text style={styles.projectCity}>📍 {item.city}</Text>
-
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progress}%` as any }]} />
-              </View>
-
-              <View style={styles.projectCardBottom}>
-                <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-                  <Text style={[styles.statusBadgeText, { color: status.text }]}>{statusLabel}</Text>
-                </View>
-                <Text style={styles.lastUpdate}>{progress}% · {relativeTime(item.updated_at)}</Text>
-              </View>
-            </TouchableOpacity>
-          )
-        }}
+        renderItem={({ item }) => (
+          <HeroProjectCard
+            item={item}
+            isCustomer={isCustomer}
+            projectHasWorker={projectHasWorker}
+            projectHasAcceptedProfessional={projectHasAcceptedProfessional}
+            onPress={() =>
+              router.push({
+                pathname: '/projects/[id]',
+                params: { id: item.id },
+              })
+            }
+          />
+        )}
       />
 
       {isCustomer ? (
-        <TouchableOpacity style={styles.fab} onPress={goToNewProject} activeOpacity={0.9}>
-          <Text style={styles.fabText}>+</Text>
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            right: 20,
+            bottom: 24,
+            width: 58,
+            height: 58,
+            borderRadius: 29,
+            backgroundColor: '#D85A30',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#D85A30',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.45,
+            shadowRadius: 12,
+            elevation: 8,
+          }}
+          onPress={goToNewProject}
+          activeOpacity={0.9}
+        >
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 30,
+              fontWeight: '300',
+              lineHeight: 34,
+              marginTop: -2,
+            }}
+          >
+            +
+          </Text>
         </TouchableOpacity>
       ) : null}
     </SafeAreaView>
@@ -323,101 +804,15 @@ export default function ProjectsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F2EDE8' },
-  loaderWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  listContent: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 110 },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#2C2C2A', marginBottom: 12 },
-  filterRow: { flexDirection: 'row', paddingBottom: 8 },
-  filterBtn: {
-    minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  filterBtnActive: {
-    backgroundColor: '#D85A30',
-    borderWidth: 1,
-    borderColor: '#D85A30',
-  },
-  filterBtnInactive: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E7E5E4',
-  },
-  filterText: { fontSize: 13, fontWeight: '700' },
-  filterTextActive: { color: '#FFFFFF' },
-  filterTextInactive: { color: '#57534E' },
-  projectCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  projectCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  projectName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2C2C2A',
+  loaderWrap: {
     flex: 1,
-    marginRight: 8,
-  },
-  stagePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  stagePillText: { fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
-  projectCity: { fontSize: 13, color: '#78716C', marginBottom: 12 },
-  progressTrack: {
-    height: 5,
-    backgroundColor: '#EDE8E3',
-    borderRadius: 3,
-    marginBottom: 10,
-    overflow: 'hidden',
-  },
-  progressFill: { height: 5, backgroundColor: '#D85A30', borderRadius: 3 },
-  projectCardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  statusBadgeText: { fontSize: 11, fontWeight: '600' },
-  lastUpdate: { fontSize: 11, color: '#A8A29E' },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    marginTop: 8,
-  },
-  emptyEmoji: { fontSize: 42, marginBottom: 10 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#2C2C2A', marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: '#78716C', textAlign: 'center', paddingHorizontal: 28, lineHeight: 20 },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#D85A30',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    backgroundColor: '#F2EDE8',
   },
-  fabText: { color: '#FFFFFF', fontSize: 28, fontWeight: '300' },
+  listContent: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 120,
+  },
 })

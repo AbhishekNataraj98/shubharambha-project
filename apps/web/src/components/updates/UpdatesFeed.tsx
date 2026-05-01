@@ -2,21 +2,11 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ComponentType } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
-  BrickWall,
   ChevronLeft,
   ChevronRight,
-  Hammer,
-  Heart,
-  MessageCircle,
-  Package,
-  Paintbrush,
   Plus,
-  RectangleHorizontal,
-  Ruler,
-  Send,
   Trash2,
   X,
 } from 'lucide-react'
@@ -40,24 +30,6 @@ type UpdatesFeedProps = {
   currentUserId: string
   currentUserRole: string
   contractorName: string
-}
-
-const stageClass: Record<string, string> = {
-  foundation: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200',
-  plinth: 'bg-blue-100/70 text-blue-700 ring-1 ring-blue-200',
-  walls: 'bg-amber-100/70 text-amber-700 ring-1 ring-amber-200',
-  slab: 'bg-orange-100/70 text-orange-700 ring-1 ring-orange-200',
-  plastering: 'bg-purple-100/70 text-purple-700 ring-1 ring-purple-200',
-  finishing: 'bg-emerald-100/70 text-emerald-700 ring-1 ring-emerald-200',
-}
-
-const stageIcon: Record<string, ComponentType<{ className?: string }>> = {
-  foundation: Ruler,
-  plinth: RectangleHorizontal,
-  walls: BrickWall,
-  slab: Hammer,
-  plastering: Paintbrush,
-  finishing: Paintbrush,
 }
 
 function initials(name: string) {
@@ -88,6 +60,25 @@ function dateLabel(dateValue: string) {
   yesterday.setDate(yesterday.getDate() - 1)
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
   return date.toLocaleDateString('en-IN', { month: 'long', day: 'numeric' })
+}
+
+function formatDateEntry(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+function stageEmoji(stage: string) {
+  const map: Record<string, string> = {
+    foundation: '⛏️',
+    plinth: '🏗️',
+    walls: '🧱',
+    slab: '🪨',
+    plastering: '🖌️',
+    finishing: '✨',
+  }
+  return map[stage] ?? '🏗️'
 }
 
 type ViewerState = {
@@ -447,7 +438,7 @@ export default function UpdatesFeed({
   }
 
   return (
-    <div className="space-y-3 pb-24">
+    <div className="space-y-3 bg-[#F2EDE8] pb-24">
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -501,7 +492,7 @@ export default function UpdatesFeed({
             >
               {showDate ? (
                 <div className="my-3 text-center">
-                  <span className="mx-auto inline-flex rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-500">
+                  <span className="mx-auto inline-flex rounded-full bg-[#E8DDD4] px-3 py-1 text-[10px] text-[#78716C]">
                     {dateLabel(item.createdAt)}
                   </span>
                 </div>
@@ -509,44 +500,29 @@ export default function UpdatesFeed({
               <div
                 className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition hover:shadow-md ${
                   highlightedUpdateId === item.id
-                    ? 'border-orange-300 ring-2 ring-orange-200'
-                    : 'border-gray-100'
+                    ? 'border-[#D85A30] ring-2 ring-orange-200'
+                    : 'border-[#E8DDD4]'
                 }`}
               >
-                {item.photoUrls[0] ? (
-                  <button
-                    type="button"
-                    onClick={() => setViewer({ photos: item.photoUrls, index: 0 })}
-                    className="group relative block h-60 w-full overflow-hidden bg-black"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.photoUrls[0]}
-                      alt="Primary update photo"
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute right-3 bottom-3 rounded-full bg-black/50 px-2 py-1 text-[11px] font-medium text-white">
-                      {item.photoUrls.length} photo{item.photoUrls.length > 1 ? 's' : ''}
-                    </div>
-                  </button>
-                ) : null}
+                <div className="flex items-center justify-between bg-[#2C2C2A] px-3.5 py-2.5">
+                  <p className="text-[10px] font-bold text-white/85">{`📝 ${formatDateEntry(item.createdAt)}`}</p>
+                  <span className="rounded-md bg-[rgba(216,90,48,0.25)] px-2 py-0.5 text-[9px] font-bold capitalize text-[#D85A30]">
+                    {stageEmoji(item.stageTag)} {item.stageTag}
+                  </span>
+                </div>
 
-                <div className="p-4">
+                <div className="p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-orange-600 text-sm font-semibold text-white shadow-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D85A30] text-[12px] font-semibold text-white">
                       {initials(item.posterName || contractorName)}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{item.posterName || contractorName}</p>
-                      <p className="text-[11px] text-gray-400">Site update</p>
+                      <p className="text-[11px] font-semibold text-[#2C2C2A]">{item.posterName || contractorName}</p>
+                      <p className="text-[9px] text-[#A8A29E]">{`Contractor · ${relativeTime(item.createdAt)}`}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
-                      {relativeTime(item.createdAt)}
-                    </p>
                     {canPost && item.postedBy === currentUserId ? (
                       <button
                         type="button"
@@ -560,66 +536,60 @@ export default function UpdatesFeed({
                   </div>
                 </div>
 
-                <span
-                  className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    stageClass[item.stageTag] ?? 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {(() => {
-                    const Icon = stageIcon[item.stageTag]
-                    return Icon ? <Icon className="mr-1 h-3.5 w-3.5" /> : null
-                  })()}
-                  {item.stageTag[0].toUpperCase() + item.stageTag.slice(1)}
-                </span>
+                <p className="mt-2 text-[13px] italic leading-relaxed text-[#78716C]">&quot;{item.description}&quot;</p>
 
-                <p className="mt-2 text-sm leading-relaxed text-gray-700">{item.description}</p>
-
-                {item.photoUrls.length > 1 ? (
-                  <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
-                    {visiblePhotos.slice(1).map((url, index) => (
+                {item.photoUrls.length > 0 ? (
+                  item.photoUrls.length === 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setViewer({ photos: item.photoUrls, index: 0 })}
+                      className="mt-3 block h-[140px] w-full overflow-hidden rounded-xl"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.photoUrls[0]} alt="Update photo" className="h-full w-full object-cover" />
+                    </button>
+                  ) : (
+                  <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1">
+                    {visiblePhotos.map((url, index) => (
                       <button
                         key={`${item.id}-${index}`}
                         type="button"
-                        className="shrink-0 overflow-hidden rounded-xl ring-1 ring-gray-100 transition hover:ring-orange-200"
-                        onClick={() => setViewer({ photos: item.photoUrls, index: index + 1 })}
+                        className="relative shrink-0 overflow-hidden rounded-lg"
+                        onClick={() => setViewer({ photos: item.photoUrls, index })}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={url}
                           alt="Update photo"
-                          className="h-[90px] w-[90px] object-cover transition hover:scale-105"
+                          className="h-[80px] w-[92px] object-cover"
                         />
+                        {index === 2 && moreCount > 0 ? (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-bold text-white">
+                            +{moreCount}
+                          </span>
+                        ) : null}
                       </button>
                     ))}
-                    {moreCount > 0 ? (
-                      <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
-                        +{moreCount} more
-                      </span>
-                    ) : null}
                   </div>
+                  )
                 ) : null}
 
                 {item.materialsUsed ? (
-                  <div className="mt-3 inline-flex items-start gap-1 rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600 ring-1 ring-gray-100">
-                    <Package className="mt-0.5 h-3 w-3 text-gray-400" />
+                  <div className="mt-2 inline-flex items-start gap-1 rounded-lg bg-[#F2EDE8] px-2.5 py-1.5 text-[10px] text-[#78716C]">
+                    <span>🧱</span>
                     <span>Materials: {item.materialsUsed}</span>
                   </div>
                 ) : null}
 
-                <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
-                  <div className="flex items-center gap-3 text-gray-500">
+                <div className="mt-3 flex items-center gap-3 border-t border-[#F2EDE8] pt-2.5 text-gray-500">
                     <button
                       type="button"
                       onClick={() => void toggleLike(item.id)}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs transition hover:bg-gray-100 ${
+                      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-1 text-[11px] transition hover:bg-gray-100 ${
                         feedbackByUpdate[item.id]?.likedByCurrentUser ? 'text-red-500' : ''
                       }`}
                     >
-                      <Heart
-                        className={`h-4 w-4 ${
-                          feedbackByUpdate[item.id]?.likedByCurrentUser ? 'fill-red-500 text-red-500' : ''
-                        }`}
-                      />
+                      <span>{feedbackByUpdate[item.id]?.likedByCurrentUser ? '❤️' : '🤍'}</span>
                       <span>{feedbackByUpdate[item.id]?.likesCount ?? 0}</span>
                     </button>
                     <button
@@ -627,20 +597,12 @@ export default function UpdatesFeed({
                       onClick={() =>
                         setExpandedComments((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
                       }
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 text-[11px] transition hover:bg-gray-100"
                     >
-                      <MessageCircle className="h-4 w-4" />
-                      <span>{feedbackByUpdate[item.id]?.comments?.length ?? 0}</span>
+                      <span>💬</span>
+                      <span>{feedbackByUpdate[item.id]?.comments?.length ?? 0} comments</span>
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100"
-                  >
-                    <Send className="h-4 w-4" />
-                    <span>Share</span>
-                  </button>
-                </div>
 
                 {expandedComments[item.id] ? (
                   <div className="mt-3 rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100">

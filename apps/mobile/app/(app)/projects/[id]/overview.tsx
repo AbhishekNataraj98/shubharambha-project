@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { Redirect, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, {
+  Path, Circle, Line, Rect,
+  Text as SvgText, G, Defs,
+  LinearGradient, Stop, Polyline,
+} from 'react-native-svg'
 import { useSessionState } from '@/lib/auth-state'
 import { apiGet, apiPost } from '@/lib/api'
 
@@ -21,6 +26,18 @@ type OverviewPayload = {
 }
 
 const BRAND = '#D85A30'
+const BRAND_DARK = '#B8471F'
+const BRAND_LIGHT = '#FBF0EB'
+const BRAND_BORDER = '#F5DDD4'
+const CHARCOAL = '#2C2C2A'
+const PAGE_BG = '#F2EDE8'
+const CARD_BG = '#FFFFFF'
+const CARD_BORDER = '#E8DDD4'
+const MUTED = '#78716C'
+const MUTED_LIGHT = '#A8A29E'
+const BLUE = '#3B82F6'
+const GREEN = '#10B981'
+const RED = '#DC2626'
 
 const PRE_STAGES = [
   { key: 'earthwork', label: 'Earthwork & excavation', weight: 4 },
@@ -164,6 +181,492 @@ function buildPlan(
   }
 }
 
+type SvgAreaChartProps = {
+  values: number[]
+  color: string
+  fillColor: string
+  labels: string[]
+  height?: number
+  showDots?: boolean
+}
+
+function SvgAreaChart({
+  values,
+  color,
+  fillColor,
+  labels,
+  height = 120,
+  showDots = true,
+}: SvgAreaChartProps) {
+  const [containerWidth, setContainerWidth] = useState(300)
+  const PAD_L = 38
+  const PAD_R = 12
+  const PAD_T = 14
+  const PAD_B = 28
+  const plotW = containerWidth - PAD_L - PAD_R
+  const plotH = height - PAD_T - PAD_B
+  const n = values.length
+  const maxVal = Math.max(1, ...values)
+
+  const yTicks = [0, 0.33, 0.66, 1].map((t) => Math.round(t * maxVal))
+
+  const getX = (i: number) =>
+    PAD_L + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW)
+  const getY = (v: number) =>
+    PAD_T + plotH - (v / maxVal) * plotH
+
+  const pts = values
+    .map((v, i) => `${getX(i)},${getY(v)}`)
+    .join(' ')
+
+  const areaPath =
+    n === 0
+      ? ''
+      : `M${getX(0)},${PAD_T + plotH} ` +
+        values.map((v, i) => `L${getX(i)},${getY(v)}`).join(' ') +
+        ` L${getX(n - 1)},${PAD_T + plotH} Z`
+
+  const formatY = (v: number): string => {
+    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`
+    if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`
+    return `₹${v}`
+  }
+
+  return (
+    <View
+      onLayout={(e) =>
+        setContainerWidth(e.nativeEvent.layout.width)
+      }
+      style={{ width: '100%' }}
+    >
+      <Svg width={containerWidth} height={height}>
+        <Defs>
+          <LinearGradient id={`grad_${color.replace('#', '')}`}
+            x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color} stopOpacity="0.25" />
+            <Stop offset="1" stopColor={color} stopOpacity="0.02" />
+          </LinearGradient>
+        </Defs>
+
+        {yTicks.map((tick) => {
+          const y = getY(tick)
+          return (
+            <G key={tick}>
+              <Line
+                x1={PAD_L} y1={y}
+                x2={containerWidth - PAD_R} y2={y}
+                stroke="#F2EDE8" strokeWidth={1}
+                strokeDasharray={tick === 0 ? undefined : '3 3'}
+              />
+              <SvgText
+                x={PAD_L - 4} y={y + 4}
+                fontSize={8} fill={MUTED_LIGHT}
+                textAnchor="end"
+              >
+                {formatY(tick)}
+              </SvgText>
+            </G>
+          )
+        })}
+
+        <Line
+          x1={PAD_L} y1={PAD_T + plotH}
+          x2={containerWidth - PAD_R} y2={PAD_T + plotH}
+          stroke={CARD_BORDER} strokeWidth={1}
+        />
+
+        {areaPath ? (
+          <Path
+            d={areaPath}
+            fill={`url(#grad_${color.replace('#', '')})`}
+          />
+        ) : null}
+
+        {n > 1 ? (
+          <Polyline
+            points={pts}
+            fill="none"
+            stroke={color}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : null}
+
+        {showDots
+          ? values.map((v, i) => (
+              <Circle
+                key={i}
+                cx={getX(i)} cy={getY(v)}
+                r={3.5} fill={CARD_BG}
+                stroke={color} strokeWidth={2}
+              />
+            ))
+          : null}
+
+        {labels.map((lbl, i) => {
+          const step = n > 10 ? 3 : n > 6 ? 2 : 1
+          if (i % step !== 0 && i !== n - 1) return null
+          return (
+            <SvgText
+              key={i}
+              x={getX(i)} y={height - 4}
+              fontSize={8} fill={MUTED_LIGHT}
+              textAnchor="middle"
+            >
+              {lbl}
+            </SvgText>
+          )
+        })}
+      </Svg>
+    </View>
+  )
+}
+
+type BarPair = { label: string; a: number; b: number }
+
+function SvgDualBarChart({
+  pairs,
+  colorA = BRAND,
+  colorB = BLUE,
+  labelA = 'Estimated',
+  labelB = 'Actual',
+  height = 160,
+}: {
+  pairs: BarPair[]
+  colorA?: string
+  colorB?: string
+  labelA?: string
+  labelB?: string
+  height?: number
+}) {
+  const [tooltip, setTooltip] = useState<{
+    x: number; y: number; value: number; color: string; label: string
+  } | null>(null)
+
+  const PAD_L = 42
+  const PAD_R = 8
+  const PAD_T = 16
+  const PAD_B = 32
+  const BAR_W = 10
+  const BAR_GAP = 3
+  const GROUP_GAP = 18
+  const GROUP_W = BAR_W * 2 + BAR_GAP + GROUP_GAP
+  const plotH = height - PAD_T - PAD_B
+  const svgW = PAD_L + pairs.length * GROUP_W + PAD_R + 16
+
+  const maxVal = Math.max(
+    1,
+    ...pairs.flatMap((p) => [p.a, p.b])
+  )
+  const yMax =
+    maxVal < 10000
+      ? Math.ceil(maxVal / 1000) * 1000
+      : Math.ceil(maxVal / 10000) * 10000
+
+  const yTicks: number[] = []
+  const tickCount = 4
+  for (let i = 0; i <= tickCount; i++) {
+    yTicks.push(Math.round((i / tickCount) * yMax))
+  }
+
+  const baseY = PAD_T + plotH
+
+  function bh(v: number) {
+    return Math.max(2, (v / yMax) * plotH)
+  }
+  function by(v: number) {
+    return baseY - bh(v)
+  }
+  function gx(i: number) {
+    return PAD_L + 8 + i * GROUP_W
+  }
+
+  const fmt = (v: number) => {
+    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`
+    if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`
+    return `₹${v}`
+  }
+
+  return (
+    <View>
+      <View style={{
+        flexDirection: 'row', gap: 14, marginBottom: 10,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colorA }} />
+          <Text style={{ fontSize: 10, color: MUTED }}>{labelA}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colorB }} />
+          <Text style={{ fontSize: 10, color: MUTED }}>{labelB}</Text>
+        </View>
+        <Text style={{
+          fontSize: 9, color: MUTED_LIGHT,
+          marginLeft: 'auto', fontStyle: 'italic',
+        }}>
+          Tap bars for values
+        </Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+      >
+        <Svg width={svgW} height={height}>
+          {yTicks.map((tick) => {
+            const y = by(tick)
+            return (
+              <G key={tick}>
+                <Line
+                  x1={PAD_L} y1={y}
+                  x2={svgW - PAD_R} y2={y}
+                  stroke="#F2EDE8" strokeWidth={1}
+                  strokeDasharray={tick === 0 ? undefined : '3 3'}
+                />
+                <SvgText
+                  x={PAD_L - 4} y={y + 4}
+                  fontSize={8} fill={MUTED_LIGHT}
+                  textAnchor="end"
+                >
+                  {fmt(tick)}
+                </SvgText>
+              </G>
+            )
+          })}
+
+          <Line
+            x1={PAD_L} y1={baseY}
+            x2={svgW - PAD_R} y2={baseY}
+            stroke={CARD_BORDER} strokeWidth={1}
+          />
+
+          {pairs.map((pair, i) => {
+            const ax = gx(i)
+            const bx = ax + BAR_W + BAR_GAP
+
+            const dimA = tooltip && (
+              tooltip.label !== pair.label ||
+              tooltip.color !== colorA
+            )
+            const dimB = tooltip && (
+              tooltip.label !== pair.label ||
+              tooltip.color !== colorB
+            )
+
+            return (
+              <G key={pair.label}>
+                <Rect
+                  x={ax} y={by(pair.a)}
+                  width={BAR_W}
+                  height={bh(pair.a)}
+                  rx={3} fill={colorA}
+                  opacity={dimA ? 0.3 : 1}
+                  onPress={() => {
+                    if (
+                      tooltip?.label === pair.label &&
+                      tooltip?.color === colorA
+                    ) {
+                      setTooltip(null)
+                    } else {
+                      setTooltip({
+                        x: ax + BAR_W / 2,
+                        y: by(pair.a),
+                        value: pair.a,
+                        color: colorA,
+                        label: pair.label,
+                      })
+                    }
+                  }}
+                />
+
+                <Rect
+                  x={bx} y={by(pair.b)}
+                  width={BAR_W}
+                  height={bh(pair.b)}
+                  rx={3} fill={colorB}
+                  opacity={dimB ? 0.3 : 1}
+                  onPress={() => {
+                    if (
+                      tooltip?.label === pair.label &&
+                      tooltip?.color === colorB
+                    ) {
+                      setTooltip(null)
+                    } else {
+                      setTooltip({
+                        x: bx + BAR_W / 2,
+                        y: by(pair.b),
+                        value: pair.b,
+                        color: colorB,
+                        label: pair.label,
+                      })
+                    }
+                  }}
+                />
+
+                <SvgText
+                  x={ax + BAR_W + BAR_GAP / 2}
+                  y={baseY + 14}
+                  fontSize={7} fill={MUTED_LIGHT}
+                  textAnchor="middle"
+                >
+                  {pair.label.length > 6
+                    ? pair.label.slice(0, 5) + '…'
+                    : pair.label}
+                </SvgText>
+              </G>
+            )
+          })}
+
+          {tooltip ? (() => {
+            const TW = 90
+            const TH = 42
+            const tx = Math.max(
+              PAD_L,
+              Math.min(tooltip.x - TW / 2, svgW - TW - PAD_R)
+            )
+            const ty = Math.max(PAD_T, tooltip.y - TH - 8)
+            const inrFmt = new Intl.NumberFormat('en-IN', {
+              style: 'currency', currency: 'INR',
+              maximumFractionDigits: 0,
+            })
+            return (
+              <G>
+                <Rect x={tx} y={ty} width={TW} height={TH}
+                  rx={8} fill={CHARCOAL} opacity={0.95} />
+                <SvgText
+                  x={tx + TW / 2} y={ty + 14}
+                  fontSize={8} fill={tooltip.color}
+                  textAnchor="middle" fontWeight="700"
+                >
+                  {tooltip.color === colorA ? labelA : labelB}
+                </SvgText>
+                <SvgText
+                  x={tx + TW / 2} y={ty + 30}
+                  fontSize={10} fill="#FFFFFF"
+                  textAnchor="middle" fontWeight="800"
+                >
+                  {inrFmt.format(tooltip.value)}
+                </SvgText>
+              </G>
+            )
+          })() : null}
+        </Svg>
+      </ScrollView>
+
+      {tooltip ? (
+        <TouchableOpacity
+          onPress={() => setTooltip(null)}
+          style={{
+            alignSelf: 'center', marginTop: 4,
+            paddingHorizontal: 12, paddingVertical: 3,
+            backgroundColor: PAGE_BG, borderRadius: 20,
+          }}
+        >
+          <Text style={{ fontSize: 9, color: MUTED }}>
+            Tap to dismiss
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  )
+}
+
+function SvgDonutChart({
+  segments,
+  total,
+  size = 120,
+}: {
+  segments: Array<{ color: string; value: number; label: string }>
+  total: number
+  size?: number
+}) {
+  const cx = size / 2
+  const cy = size / 2
+  const R = size / 2 - 14
+  const strokeW = 14
+  const circumference = 2 * Math.PI * R
+
+  let offset = 0
+  const paths = segments.map((seg) => {
+    const frac = total > 0 ? seg.value / total : 0
+    const dash = frac * circumference
+    const gap = circumference - dash
+    const rotate = -90 + (offset / circumference) * 360
+    offset += dash
+    return { ...seg, dash, gap, rotate }
+  })
+
+  const fmt = (v: number) =>
+    v >= 100000
+      ? `₹${(v / 100000).toFixed(1)}L`
+      : `₹${(v / 1000).toFixed(0)}K`
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <Svg width={size} height={size}>
+        <Circle
+          cx={cx} cy={cy} r={R}
+          fill="none" stroke={PAGE_BG}
+          strokeWidth={strokeW}
+        />
+        {paths.map((seg, i) => (
+          <Circle
+            key={i}
+            cx={cx} cy={cy} r={R}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={strokeW}
+            strokeDasharray={`${seg.dash} ${seg.gap}`}
+            transform={`rotate(${seg.rotate} ${cx} ${cy})`}
+          />
+        ))}
+        <SvgText
+          x={cx} y={cy - 6}
+          textAnchor="middle"
+          fontSize={11} fontWeight="800" fill={CHARCOAL}
+        >
+          {fmt(total)}
+        </SvgText>
+        <SvgText
+          x={cx} y={cy + 8}
+          textAnchor="middle"
+          fontSize={8} fill={MUTED}
+        >
+          budget
+        </SvgText>
+      </Svg>
+
+      <View style={{ flex: 1, gap: 5 }}>
+        {segments.map((seg, i) => (
+          <View key={i} style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{
+                width: 8, height: 8,
+                borderRadius: 2,
+                backgroundColor: seg.color,
+              }} />
+              <Text style={{ fontSize: 9, color: MUTED }}>
+                {seg.label}
+              </Text>
+            </View>
+            <Text style={{
+              fontSize: 9, fontWeight: '700', color: CHARCOAL,
+            }}>
+              {fmt(seg.value)}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
 export default function ProjectOverviewScreen() {
   const { id: rawProjectId } = useLocalSearchParams<{ id: string }>()
   const projectId = Array.isArray(rawProjectId) ? rawProjectId[0] : rawProjectId
@@ -256,12 +759,32 @@ export default function ProjectOverviewScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F7F5' }} edges={['left', 'right']}>
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 28 }}>
-        <Text style={{ fontSize: 24, fontWeight: '900', color: '#111827' }}>Project Overview</Text>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: PAGE_BG }}
+      edges={['left', 'right']}
+    >
+      <ScrollView contentContainerStyle={{
+        paddingBottom: 32,
+      }}>
+        <View style={{
+          backgroundColor: CHARCOAL,
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: 16,
+        }}>
+          <Text style={{
+            fontSize: 20,
+            fontWeight: '800',
+            color: '#FFFFFF',
+          }}>
+            Project Overview
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 12 }}
+            contentContainerStyle={{ gap: 6, paddingRight: 4 }}
+          >
             {[
               ['market', 'Market'],
               ['sr', 'PWD SR'],
@@ -272,252 +795,953 @@ export default function ProjectOverviewScreen() {
                 key={key}
                 onPress={() => setActiveTab(key as typeof activeTab)}
                 style={{
-                  borderRadius: 999,
-                  paddingHorizontal: 12,
+                  borderRadius: 20,
+                  paddingHorizontal: 14,
                   paddingVertical: 7,
-                  backgroundColor: activeTab === key ? BRAND : '#FFFFFF',
-                  borderWidth: 1,
-                  borderColor: activeTab === key ? BRAND : '#E5E7EB',
+                  backgroundColor:
+                    activeTab === key
+                      ? BRAND
+                      : 'rgba(255,255,255,0.12)',
+                  borderWidth: 0.5,
+                  borderColor:
+                    activeTab === key
+                      ? BRAND
+                      : 'rgba(255,255,255,0.2)',
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: activeTab === key ? '#FFFFFF' : '#374151' }}>{label}</Text>
+                <Text style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color: activeTab === key
+                    ? '#FFFFFF'
+                    : 'rgba(255,255,255,0.7)',
+                }}>
+                  {label}
+                </Text>
               </TouchableOpacity>
             ))}
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </View>
 
-        <View
-          style={{
-            marginTop: 12,
+        <View style={{ margin: 14, marginBottom: 0 }}>
+          <View style={{
             borderRadius: 14,
-            borderWidth: 1,
-            borderColor: '#FED7AA',
-            backgroundColor: '#FFF8F3',
+            borderWidth: 0.5,
+            borderColor: BRAND_BORDER,
+            backgroundColor: BRAND_LIGHT,
             padding: 12,
-          }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: '800', color: '#374151' }}>Project Parameters</Text>
-          <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-            <SelectMetric
-              label="Tier"
-              value={tier}
-              onChange={(value) => {
-                const next = value as TierKey
-                setTier(next)
-                setCostPerSqft(String(TIER_BANDS[next].reference))
-              }}
-              options={[
-                { label: 'Low', value: 'low' },
-                { label: 'Medium', value: 'medium' },
-                { label: 'High', value: 'high' },
-              ]}
-            />
-            <MetricInput label="SR overhead %" value={srOverheadPct} onChange={setSrOverheadPct} />
-            <MetricInput label="SR GST %" value={srGstPct} onChange={setSrGstPct} />
-          </View>
-          <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-            <MetricInput label="Cost / sqft" value={costPerSqft} onChange={setCostPerSqft} />
-            <MetricInput label="Area (sqft)" value={areaSqft} onChange={setAreaSqft} />
-            <MetricInput label="Floors" value={floors} onChange={setFloors} />
+          }}>
+            <Text style={{
+              fontSize: 11,
+              fontWeight: '700',
+              color: MUTED,
+              letterSpacing: 0.06,
+              marginBottom: 10,
+            }}>
+              PROJECT PARAMETERS
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <SelectMetric
+                label="Tier"
+                value={tier}
+                onChange={(value) => {
+                  const next = value as TierKey
+                  setTier(next)
+                  setCostPerSqft(String(TIER_BANDS[next].reference))
+                }}
+                options={[
+                  { label: 'Low', value: 'low' },
+                  { label: 'Medium', value: 'medium' },
+                  { label: 'High', value: 'high' },
+                ]}
+              />
+              <MetricInput
+                label="SR overhead %"
+                value={srOverheadPct}
+                onChange={setSrOverheadPct}
+              />
+              <MetricInput
+                label="SR GST %"
+                value={srGstPct}
+                onChange={setSrGstPct}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+              <MetricInput
+                label="Cost / sqft"
+                value={costPerSqft}
+                onChange={setCostPerSqft}
+              />
+              <MetricInput
+                label="Area (sqft)"
+                value={areaSqft}
+                onChange={setAreaSqft}
+              />
+              <MetricInput
+                label="Floors"
+                value={floors}
+                onChange={setFloors}
+              />
+            </View>
           </View>
         </View>
 
-        <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
-          <KpiCard title="Est. Budget" value={formatINR(totalBudget)} tint="#EFF6FF" border="#BFDBFE" text="#1E3A8A" />
-          <KpiCard title="Actual Spent" value={formatINR(actualTotal)} tint="#FFF7ED" border="#FED7AA" text="#9A3412" />
+        <View style={{
+          flexDirection: 'row', gap: 8,
+          margin: 14, marginBottom: 0,
+        }}>
+          <KpiCard
+            title="Est. Budget"
+            value={formatINR(totalBudget)}
+            tint="#EFF6FF" border="#BFDBFE" text="#1E3A8A"
+          />
+          <KpiCard
+            title="Actual Spent"
+            value={formatINR(actualTotal)}
+            tint={BRAND_LIGHT} border={BRAND_BORDER}
+            text={BRAND_DARK}
+          />
           <KpiCard
             title="Variance"
-            value={`${variance >= 0 ? '+' : '-'}${formatINR(Math.abs(variance))}`}
-            tint={variance > 0 ? '#FEF2F2' : variance < 0 ? '#ECFDF5' : '#F8FAFC'}
-            border={variance > 0 ? '#FECACA' : variance < 0 ? '#BBF7D0' : '#E2E8F0'}
-            text={variance > 0 ? '#B91C1C' : variance < 0 ? '#166534' : '#334155'}
+            value={`${variance >= 0 ? '+' : ''}${formatINR(variance)}`}
+            tint={variance > 0 ? '#FEF2F2'
+              : variance < 0 ? '#ECFDF5' : '#F2EDE8'}
+            border={variance > 0 ? '#FECACA'
+              : variance < 0 ? '#BBF7D0' : CARD_BORDER}
+            text={variance > 0 ? RED
+              : variance < 0 ? '#166534' : MUTED}
           />
         </View>
 
         {activeTab === 'market' ? (
-          <>
-            <View style={{ marginTop: 14, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', padding: 12 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>Cost Projection Timeline</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <LegendDot color="#93C5FD" label="Stage" />
-                  <LegendDot color="#1D4ED8" label="Cumulative" />
-                </View>
-              </View>
-              <SimpleChart
-                rows={rows.map((r, index) => ({ label: stageCodes[index], value: r.estimate }))}
-                color="#93C5FD"
-                cumulativeColor="#1D4ED8"
+          <View style={{ margin: 14, gap: 12 }}>
+            <View style={{
+              backgroundColor: CARD_BG,
+              borderRadius: 14,
+              borderWidth: 0.5,
+              borderColor: CARD_BORDER,
+              padding: 14,
+            }}>
+              <Text style={{
+                fontSize: 12, fontWeight: '700',
+                color: CHARCOAL, marginBottom: 14,
+              }}>
+                Budget Breakdown
+              </Text>
+              <SvgDonutChart
+                total={totalBudget}
+                segments={[
+                  {
+                    color: BRAND,
+                    value: totalBudget * 0.35,
+                    label: 'Structure (35%)',
+                  },
+                  {
+                    color: '#F59E0B',
+                    value: totalBudget * 0.20,
+                    label: 'Masonry (20%)',
+                  },
+                  {
+                    color: BLUE,
+                    value: totalBudget * 0.25,
+                    label: 'Finishing (25%)',
+                  },
+                  {
+                    color: GREEN,
+                    value: totalBudget * 0.20,
+                    label: 'Others (20%)',
+                  },
+                ]}
               />
-              <Text style={{ marginTop: 6, fontSize: 11, color: '#6B7280' }}>Range band: {formatINR(lowTotal)} to {formatINR(highTotal)}</Text>
             </View>
 
-            <View style={{ marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', padding: 12 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>Actual vs Estimated</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <LegendDot color="#BFDBFE" label="Est." />
-                  <LegendDot color={BRAND} label="Actual" />
-                  <LegendDot color="#059669" label="Cum." />
-                </View>
+            <View style={{
+              backgroundColor: CARD_BG,
+              borderRadius: 14,
+              borderWidth: 0.5,
+              borderColor: CARD_BORDER,
+              padding: 14,
+            }}>
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 10,
+              }}>
+                <Text style={{
+                  fontSize: 12, fontWeight: '700',
+                  color: CHARCOAL,
+                }}>
+                  Cost Projection Timeline
+                </Text>
+                <Text style={{
+                  fontSize: 9, color: MUTED_LIGHT,
+                  fontStyle: 'italic',
+                }}>
+                  Cumulative
+                </Text>
               </View>
-              <SimpleDualChart rows={rows} labels={stageCodes} />
+              <SvgAreaChart
+                values={cumulativeSeries(
+                  rows.map((r) => r.estimate)
+                )}
+                labels={stageCodes}
+                color={BRAND}
+                fillColor={BRAND_LIGHT}
+                height={140}
+              />
+              <View style={{
+                marginTop: 8,
+                backgroundColor: PAGE_BG,
+                borderRadius: 8,
+                padding: 8,
+              }}>
+                <Text style={{
+                  fontSize: 10, color: MUTED,
+                  textAlign: 'center',
+                }}>
+                  Range band: {formatINR(lowTotal)} — {formatINR(highTotal)}
+                </Text>
+              </View>
             </View>
-          </>
+
+            <View style={{
+              backgroundColor: CARD_BG,
+              borderRadius: 14,
+              borderWidth: 0.5,
+              borderColor: CARD_BORDER,
+              padding: 14,
+            }}>
+              <Text style={{
+                fontSize: 12, fontWeight: '700',
+                color: CHARCOAL, marginBottom: 2,
+              }}>
+                Estimated vs Actual per Stage
+              </Text>
+              <SvgDualBarChart
+                pairs={rows.map((r, i) => ({
+                  label: stageCodes[i] ?? `S${i + 1}`,
+                  a: r.estimate,
+                  b: r.actual,
+                }))}
+                colorA={BRAND}
+                colorB={BLUE}
+                labelA="Estimated"
+                labelB="Actual"
+                height={170}
+              />
+            </View>
+          </View>
         ) : null}
 
         {activeTab === 'sr' ? (
-          <View style={{ marginTop: 14, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', padding: 12 }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>PWD SR rate / sqft</Text>
-            <Text style={{ marginTop: 6, fontSize: 12, color: '#6B7280' }}>
-              SR total: {formatINR(srTotal)} ({formatINR(srTotal / numericArea)} per sqft)
-            </Text>
-            <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>Market premium: {formatINR(totalBudget - srTotal)}</Text>
-            <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#F2EDE8', borderRadius: 10 }}>
-              {SR_ITEMS.map((item) => (
-                <View key={item.item} style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: '#F2EDE8' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#111827' }}>{item.item}</Text>
-                  <Text style={{ fontSize: 11, color: '#6B7280' }}>
-                    SR {formatINR(item.srRate)} · Qty/1000 sqft {item.qtyPer1000Sqft}
+          <View style={{ margin: 14, gap: 12 }}>
+            <View style={{
+              backgroundColor: CHARCOAL,
+              borderRadius: 14,
+              padding: 14,
+            }}>
+              <Text style={{
+                fontSize: 10, color: 'rgba(255,255,255,0.4)',
+                letterSpacing: 0.06, marginBottom: 10,
+              }}>
+                MARKET vs PWD SR
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{
+                  flex: 1,
+                  backgroundColor: 'rgba(216,90,48,0.2)',
+                  borderRadius: 10, padding: 10,
+                  alignItems: 'center',
+                }}>
+                  <Text style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.5)',
+                  }}>
+                    Market rate
+                  </Text>
+                  <Text style={{
+                    fontSize: 18, fontWeight: '800',
+                    color: BRAND, marginTop: 2,
+                  }}>
+                    {formatINR(totalBudget)}
+                  </Text>
+                  <Text style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.4)',
+                    marginTop: 2,
+                  }}>
+                    {formatINR(numericCost)}/sqft
                   </Text>
                 </View>
-              ))}
+                <View style={{
+                  flex: 1,
+                  backgroundColor: 'rgba(59,130,246,0.2)',
+                  borderRadius: 10, padding: 10,
+                  alignItems: 'center',
+                }}>
+                  <Text style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.5)',
+                  }}>
+                    PWD SR
+                  </Text>
+                  <Text style={{
+                    fontSize: 18, fontWeight: '800',
+                    color: '#93C5FD', marginTop: 2,
+                  }}>
+                    {formatINR(srTotal)}
+                  </Text>
+                  <Text style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.4)',
+                    marginTop: 2,
+                  }}>
+                    {formatINR(srTotal / numericArea)}/sqft
+                  </Text>
+                </View>
+              </View>
+              <View style={{
+                marginTop: 10,
+                backgroundColor: 'rgba(16,185,129,0.15)',
+                borderRadius: 8, padding: 8,
+                alignItems: 'center',
+              }}>
+                <Text style={{
+                  fontSize: 11, fontWeight: '700',
+                  color: '#10B981',
+                }}>
+                  Premium over SR: {formatINR(totalBudget - srTotal)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={{
+              backgroundColor: CARD_BG,
+              borderRadius: 14,
+              borderWidth: 0.5,
+              borderColor: CARD_BORDER,
+              padding: 14,
+            }}>
+              <Text style={{
+                fontSize: 12, fontWeight: '700',
+                color: CHARCOAL, marginBottom: 12,
+              }}>
+                PWD SR Breakdown
+              </Text>
+              {SR_ITEMS.map((item) => {
+                const itemTotal =
+                  item.srRate *
+                  item.qtyPer1000Sqft *
+                  (numericArea / 1000)
+                const maxSrTotal = SR_ITEMS.reduce(
+                  (m, si) =>
+                    Math.max(
+                      m,
+                      si.srRate *
+                        si.qtyPer1000Sqft *
+                        (numericArea / 1000)
+                    ),
+                  1
+                )
+                const pct = itemTotal / maxSrTotal
+                return (
+                  <View key={item.item} style={{
+                    marginBottom: 10,
+                  }}>
+                    <View style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      marginBottom: 4,
+                    }}>
+                      <Text style={{
+                        fontSize: 11, fontWeight: '600',
+                        color: CHARCOAL, flex: 1,
+                      }} numberOfLines={1}>
+                        {item.item}
+                      </Text>
+                      <Text style={{
+                        fontSize: 11, fontWeight: '700',
+                        color: BRAND,
+                      }}>
+                        {formatINR(itemTotal)}
+                      </Text>
+                    </View>
+                    <View style={{
+                      height: 6,
+                      backgroundColor: PAGE_BG,
+                      borderRadius: 3,
+                      overflow: 'hidden',
+                    }}>
+                      <View style={{
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: BRAND,
+                        width: `${pct * 100}%`,
+                      }} />
+                    </View>
+                    <Text style={{
+                      fontSize: 9, color: MUTED_LIGHT,
+                      marginTop: 2,
+                    }}>
+                      SR {formatINR(item.srRate)} ·
+                      Qty {item.qtyPer1000Sqft}/1000sqft
+                    </Text>
+                  </View>
+                )
+              })}
             </View>
           </View>
         ) : null}
 
         {activeTab === 'building' ? (
-          <View style={{ marginTop: 14, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF', padding: 12 }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>Individual Building Estimation</Text>
+          <View style={{ margin: 14, gap: 10 }}>
             {ROOM_PRESETS.map((room, index) => {
-              const length = Math.max(1, Number(roomInputs[index]?.length) || room.length)
-              const width = Math.max(1, Number(roomInputs[index]?.width) || room.width)
-              const area = length * width
-              return (
-                <View key={room.name} style={{ marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F8FAFC', padding: 10 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }}>{room.name}</Text>
-                  <View style={{ marginTop: 6, flexDirection: 'row', gap: 8 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ marginBottom: 4, fontSize: 10, fontWeight: '700', color: '#6B7280' }}>Length (ft)</Text>
-                      <TextInput
-                        value={roomInputs[index]?.length ?? String(room.length)}
-                        onChangeText={(text) => onChangeRoomInput(index, 'length', text)}
-                        keyboardType="number-pad"
-                        style={{
-                          minHeight: 34,
-                          borderWidth: 1,
-                          borderColor: '#E5E7EB',
-                          borderRadius: 8,
-                          paddingHorizontal: 10,
-                          backgroundColor: '#FFFFFF',
-                          fontSize: 12,
-                        }}
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ marginBottom: 4, fontSize: 10, fontWeight: '700', color: '#6B7280' }}>Width (ft)</Text>
-                      <TextInput
-                        value={roomInputs[index]?.width ?? String(room.width)}
-                        onChangeText={(text) => onChangeRoomInput(index, 'width', text)}
-                        keyboardType="number-pad"
-                        style={{
-                          minHeight: 34,
-                          borderWidth: 1,
-                          borderColor: '#E5E7EB',
-                          borderRadius: 8,
-                          paddingHorizontal: 10,
-                          backgroundColor: '#FFFFFF',
-                          fontSize: 12,
-                        }}
-                      />
-                    </View>
-                  </View>
-                  <Text style={{ marginTop: 6, fontSize: 11, color: '#6B7280' }}>{area} sqft/floor · factor {room.factor}x</Text>
-                  <Text style={{ marginTop: 4, fontSize: 12, color: '#0C4A6E' }}>
-                    Market: {formatINR(area * numericFloors * numericCost * room.factor)}
-                  </Text>
-                  <Text style={{ marginTop: 2, fontSize: 12, color: '#1E3A8A' }}>
-                    PWD SR: {formatINR(area * numericFloors * (srTotal / numericArea) * room.factor)}
-                  </Text>
-                </View>
+              const length = Math.max(
+                1,
+                Number(roomInputs[index]?.length) || room.length
               )
-            })}
-          </View>
-        ) : null}
+              const width = Math.max(
+                1,
+                Number(roomInputs[index]?.width) || room.width
+              )
+              const area = length * width
+              const marketCost =
+                area * numericFloors * numericCost * room.factor
+              const srCost =
+                area *
+                numericFloors *
+                (srTotal / numericArea) *
+                room.factor
+              const saving = marketCost - srCost
 
-        {activeTab === 'tracking' ? (
-          <View style={{ marginTop: 14, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', overflow: 'hidden' }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 2 }}>
-              Stage-wise Tracking
-            </Text>
-            <ScrollView style={{ maxHeight: 360 }} nestedScrollEnabled stickyHeaderIndices={[0]}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  backgroundColor: '#FFF7ED',
-                  borderTopWidth: 1,
-                  borderTopColor: '#FFEDD5',
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#FFEDD5',
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#9A3412' }}>Stage</Text>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#9A3412' }}>Estimated</Text>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#9A3412' }}>Actual / Status</Text>
-              </View>
-              {rows.map((row, index) => {
-                const delta = row.actual - row.estimate
-                return (
-                  <View key={row.stageKey} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#F2EDE8' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <View style={{ borderRadius: 8, backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#475569' }}>{`S${index + 1}`}</Text>
+              return (
+                <View key={room.name} style={{
+                  backgroundColor: CARD_BG,
+                  borderRadius: 14,
+                  borderWidth: 0.5,
+                  borderColor: CARD_BORDER,
+                  overflow: 'hidden',
+                }}>
+                  <View style={{
+                    backgroundColor: CHARCOAL,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                    <Text style={{
+                      fontSize: 12, fontWeight: '700',
+                      color: '#FFFFFF',
+                    }}>
+                      {room.name}
+                    </Text>
+                    <Text style={{
+                      fontSize: 10,
+                      color: 'rgba(255,255,255,0.5)',
+                    }}>
+                      {area} sqft · {room.factor}x
+                    </Text>
+                  </View>
+
+                  <View style={{ padding: 12 }}>
+                    <View style={{
+                      flexDirection: 'row', gap: 8,
+                      marginBottom: 10,
+                    }}>
+                      <View style={{
+                        width: 52, height: 44,
+                        backgroundColor: BRAND_LIGHT,
+                        borderWidth: 1.5,
+                        borderColor: BRAND,
+                        borderRadius: 6,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}>
+                        <Text style={{
+                          fontSize: 10, fontWeight: '700',
+                          color: BRAND,
+                        }}>
+                          {length}×{width}
+                        </Text>
+                        <Text style={{
+                          fontSize: 7, color: MUTED_LIGHT,
+                          marginTop: 1,
+                        }}>
+                          ft
+                        </Text>
                       </View>
-                      <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: '#111827' }}>{row.stageLabel}</Text>
+                      <View style={{ flex: 1 }}>
+                        <View style={{
+                          flexDirection: 'row', gap: 6,
+                        }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{
+                              fontSize: 9, fontWeight: '600',
+                              color: MUTED, marginBottom: 4,
+                            }}>
+                              Length (ft)
+                            </Text>
+                            <TextInput
+                              value={
+                                roomInputs[index]?.length ??
+                                String(room.length)
+                              }
+                              onChangeText={(t) =>
+                                onChangeRoomInput(index, 'length', t)
+                              }
+                              keyboardType="number-pad"
+                              style={{
+                                height: 34,
+                                borderWidth: 0.5,
+                                borderColor: CARD_BORDER,
+                                borderRadius: 8,
+                                paddingHorizontal: 8,
+                                backgroundColor: PAGE_BG,
+                                fontSize: 13,
+                                color: CHARCOAL,
+                                fontWeight: '700',
+                              }}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{
+                              fontSize: 9, fontWeight: '600',
+                              color: MUTED, marginBottom: 4,
+                            }}>
+                              Width (ft)
+                            </Text>
+                            <TextInput
+                              value={
+                                roomInputs[index]?.width ??
+                                String(room.width)
+                              }
+                              onChangeText={(t) =>
+                                onChangeRoomInput(index, 'width', t)
+                              }
+                              keyboardType="number-pad"
+                              style={{
+                                height: 34,
+                                borderWidth: 0.5,
+                                borderColor: CARD_BORDER,
+                                borderRadius: 8,
+                                paddingHorizontal: 8,
+                                backgroundColor: PAGE_BG,
+                                fontSize: 13,
+                                color: CHARCOAL,
+                                fontWeight: '700',
+                              }}
+                            />
+                          </View>
+                        </View>
+                      </View>
                     </View>
-                    <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>Estimated: {formatINR(row.estimate)} · SR: {formatINR(row.sr)}</Text>
-                    <Text style={{ marginTop: 2, fontSize: 11, color: '#6B7280' }}>Range: {formatINR(row.low)} to {formatINR(row.high)}</Text>
-                    <TextInput
-                      placeholder="Enter actual amount"
-                      keyboardType="number-pad"
-                      value={row.actual ? String(Math.round(row.actual)) : ''}
-                      onChangeText={(text) => onChangeActual(row.stageKey, text)}
-                      style={{
-                        marginTop: 6,
-                        minHeight: 36,
-                        borderWidth: 1,
-                        borderColor: '#E5E7EB',
-                        borderRadius: 8,
-                        paddingHorizontal: 10,
-                        fontSize: 13,
-                      }}
-                    />
-                    <View style={{ marginTop: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 12, color: delta > 0 ? '#B91C1C' : delta < 0 ? '#166534' : '#6B7280' }}>
-                        Var: {delta > 0 ? '+' : ''}
-                        {formatINR(delta)}
-                      </Text>
-                      <View
-                        style={{
-                          borderRadius: 999,
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          backgroundColor: row.actual === 0 ? '#F2EDE8' : delta > 0 ? '#FEE2E2' : delta < 0 ? '#DCFCE7' : '#E5E7EB',
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: row.actual === 0 ? '#6B7280' : delta > 0 ? '#B91C1C' : delta < 0 ? '#166534' : '#4B5563' }}>
-                          {row.actual === 0 ? 'Pending' : delta > 0 ? 'Over budget' : delta < 0 ? 'Under budget' : 'On budget'}
+
+                    <View style={{
+                      flexDirection: 'row', gap: 6,
+                    }}>
+                      <View style={{
+                        flex: 1, backgroundColor: BRAND_LIGHT,
+                        borderRadius: 8, padding: 8,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 8, color: MUTED,
+                        }}>
+                          Market
+                        </Text>
+                        <Text style={{
+                          fontSize: 12, fontWeight: '800',
+                          color: BRAND, marginTop: 2,
+                        }}>
+                          {formatINR(marketCost)}
+                        </Text>
+                      </View>
+                      <View style={{
+                        flex: 1, backgroundColor: '#EFF6FF',
+                        borderRadius: 8, padding: 8,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 8, color: MUTED,
+                        }}>
+                          PWD SR
+                        </Text>
+                        <Text style={{
+                          fontSize: 12, fontWeight: '800',
+                          color: '#1D4ED8', marginTop: 2,
+                        }}>
+                          {formatINR(srCost)}
+                        </Text>
+                      </View>
+                      <View style={{
+                        flex: 1, backgroundColor: '#ECFDF5',
+                        borderRadius: 8, padding: 8,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 8, color: MUTED,
+                        }}>
+                          Saving
+                        </Text>
+                        <Text style={{
+                          fontSize: 12, fontWeight: '800',
+                          color: '#166534', marginTop: 2,
+                        }}>
+                          {formatINR(saving)}
                         </Text>
                       </View>
                     </View>
                   </View>
-                )
-              })}
-            </ScrollView>
+                </View>
+              )
+            })}
+
+            <View style={{
+              backgroundColor: CHARCOAL,
+              borderRadius: 12,
+              padding: 12,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <Text style={{
+                fontSize: 12, fontWeight: '700',
+                color: '#FFFFFF',
+              }}>
+                Total ({ROOM_PRESETS.length} rooms)
+              </Text>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{
+                  fontSize: 16, fontWeight: '800',
+                  color: BRAND,
+                }}>
+                  {formatINR(totalBudget)}
+                </Text>
+                <Text style={{
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.4)',
+                  marginTop: 1,
+                }}>
+                  market rate
+                </Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {activeTab === 'tracking' ? (
+          <View style={{ margin: 14, gap: 10 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {[
+                {
+                  count: rows.filter(
+                    (r) => r.actual > 0 && r.actual < r.estimate
+                  ).length,
+                  label: 'Under',
+                  bg: '#DCFCE7',
+                  border: '#BBF7D0',
+                  color: '#166534',
+                },
+                {
+                  count: rows.filter(
+                    (r) => r.actual > r.estimate
+                  ).length,
+                  label: 'Over',
+                  bg: '#FEE2E2',
+                  border: '#FECACA',
+                  color: RED,
+                },
+                {
+                  count: rows.filter((r) => r.actual === 0).length,
+                  label: 'Pending',
+                  bg: PAGE_BG,
+                  border: CARD_BORDER,
+                  color: MUTED_LIGHT,
+                },
+              ].map((pill) => (
+                <View key={pill.label} style={{
+                  flex: 1,
+                  backgroundColor: pill.bg,
+                  borderWidth: 0.5,
+                  borderColor: pill.border,
+                  borderRadius: 10,
+                  padding: 8,
+                  alignItems: 'center',
+                }}>
+                  <Text style={{
+                    fontSize: 16, fontWeight: '800',
+                    color: pill.color,
+                  }}>
+                    {pill.count}
+                  </Text>
+                  <Text style={{
+                    fontSize: 9, color: pill.color,
+                    marginTop: 1,
+                  }}>
+                    {pill.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {rows.map((row, index) => {
+              const delta = row.actual - row.estimate
+              const isOver = row.actual > 0 && delta > 0
+              const isUnder = row.actual > 0 && delta < 0
+              const isPending = row.actual === 0
+
+              const headerBg = isOver
+                ? '#DC2626'
+                : isUnder
+                  ? '#166534'
+                  : CHARCOAL
+              const badgeText = isPending
+                ? 'Pending'
+                : isOver
+                  ? '⚠️ Over budget'
+                  : isUnder
+                    ? '✓ Under budget'
+                    : '= On budget'
+              const badgeBg = isPending
+                ? 'rgba(255,255,255,0.1)'
+                : isOver
+                  ? 'rgba(255,255,255,0.2)'
+                  : 'rgba(255,255,255,0.2)'
+
+              return (
+                <View key={row.stageKey} style={{
+                  backgroundColor: CARD_BG,
+                  borderRadius: 14,
+                  borderWidth: 0.5,
+                  borderColor: CARD_BORDER,
+                  overflow: 'hidden',
+                }}>
+                  <View style={{
+                    backgroundColor: headerBg,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{
+                        width: 22, height: 22,
+                        borderRadius: 6,
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 8, fontWeight: '800',
+                          color: '#FFFFFF',
+                        }}>
+                          {`S${index + 1}`}
+                        </Text>
+                      </View>
+                      <Text style={{
+                        fontSize: 12, fontWeight: '700',
+                        color: '#FFFFFF', flex: 1,
+                      }} numberOfLines={1}>
+                        {row.stageLabel}
+                      </Text>
+                    </View>
+                    <View style={{
+                      backgroundColor: badgeBg,
+                      borderRadius: 8,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                    }}>
+                      <Text style={{
+                        fontSize: 8, fontWeight: '700',
+                        color: '#FFFFFF',
+                      }}>
+                        {badgeText}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ padding: 12 }}>
+                    <View style={{
+                      flexDirection: 'row', gap: 6,
+                      marginBottom: 10,
+                    }}>
+                      <View style={{
+                        flex: 1, backgroundColor: PAGE_BG,
+                        borderRadius: 8, padding: 7,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 7, color: MUTED_LIGHT,
+                        }}>Estimated</Text>
+                        <Text style={{
+                          fontSize: 10, fontWeight: '800',
+                          color: CHARCOAL, marginTop: 2,
+                        }}>
+                          {formatINR(row.estimate)}
+                        </Text>
+                      </View>
+                      <View style={{
+                        flex: 1,
+                        backgroundColor: isPending
+                          ? PAGE_BG
+                          : isOver
+                            ? '#FEE2E2'
+                            : '#DCFCE7',
+                        borderRadius: 8, padding: 7,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 7, color: MUTED_LIGHT,
+                        }}>Actual</Text>
+                        <Text style={{
+                          fontSize: 10, fontWeight: '800',
+                          color: isPending
+                            ? MUTED_LIGHT
+                            : isOver
+                              ? RED
+                              : '#166534',
+                          marginTop: 2,
+                        }}>
+                          {isPending
+                            ? '—'
+                            : formatINR(row.actual)}
+                        </Text>
+                      </View>
+                      <View style={{
+                        flex: 1,
+                        backgroundColor: isPending
+                          ? PAGE_BG
+                          : isOver
+                            ? '#FEE2E2'
+                            : '#DCFCE7',
+                        borderRadius: 8, padding: 7,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 7, color: MUTED_LIGHT,
+                        }}>Variance</Text>
+                        <Text style={{
+                          fontSize: 10, fontWeight: '800',
+                          color: isPending
+                            ? MUTED_LIGHT
+                            : isOver
+                              ? RED
+                              : '#166534',
+                          marginTop: 2,
+                        }}>
+                          {isPending
+                            ? '—'
+                            : `${delta > 0 ? '+' : ''}${formatINR(delta)}`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={{
+                      fontSize: 9, color: MUTED_LIGHT,
+                      marginBottom: 8,
+                    }}>
+                      Range: {formatINR(row.low)} –{' '}
+                      {formatINR(row.high)} · SR: {formatINR(row.sr)}
+                    </Text>
+
+                    {!isPending ? (
+                      <View style={{ marginBottom: 10, gap: 5 }}>
+                        <View>
+                          <View style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            marginBottom: 3,
+                          }}>
+                            <Text style={{
+                              fontSize: 8, color: MUTED_LIGHT,
+                            }}>
+                              Estimated
+                            </Text>
+                            <Text style={{
+                              fontSize: 8, color: BRAND,
+                            }}>
+                              {Math.round(
+                                (row.estimate /
+                                  Math.max(row.estimate, row.actual)) *
+                                  100
+                              )}%
+                            </Text>
+                          </View>
+                          <View style={{
+                            height: 6, backgroundColor: PAGE_BG,
+                            borderRadius: 3, overflow: 'hidden',
+                          }}>
+                            <View style={{
+                              height: 6, borderRadius: 3,
+                              backgroundColor: BRAND,
+                              width: `${Math.min(100, (row.estimate / Math.max(row.estimate, row.actual)) * 100)}%`,
+                            }} />
+                          </View>
+                        </View>
+                        <View>
+                          <View style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            marginBottom: 3,
+                          }}>
+                            <Text style={{
+                              fontSize: 8, color: MUTED_LIGHT,
+                            }}>
+                              Actual
+                            </Text>
+                            <Text style={{
+                              fontSize: 8,
+                              color: isOver ? RED : '#166534',
+                            }}>
+                              {Math.round(
+                                (row.actual /
+                                  Math.max(row.estimate, row.actual)) *
+                                  100
+                              )}%
+                            </Text>
+                          </View>
+                          <View style={{
+                            height: 6, backgroundColor: PAGE_BG,
+                            borderRadius: 3, overflow: 'hidden',
+                          }}>
+                            <View style={{
+                              height: 6, borderRadius: 3,
+                              backgroundColor: isOver ? RED : '#166534',
+                              width: `${Math.min(100, (row.actual / Math.max(row.estimate, row.actual)) * 100)}%`,
+                            }} />
+                          </View>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    <TextInput
+                      placeholder="Enter actual amount"
+                      placeholderTextColor={MUTED_LIGHT}
+                      keyboardType="number-pad"
+                      value={row.actual ? String(Math.round(row.actual)) : ''}
+                      onChangeText={(text) =>
+                        onChangeActual(row.stageKey, text)
+                      }
+                      style={{
+                        height: 40,
+                        borderWidth: 0.5,
+                        borderColor: CARD_BORDER,
+                        borderRadius: 10,
+                        paddingHorizontal: 12,
+                        backgroundColor: PAGE_BG,
+                        fontSize: 14,
+                        color: CHARCOAL,
+                        fontWeight: '600',
+                      }}
+                    />
+                  </View>
+                </View>
+              )
+            })}
           </View>
         ) : null}
 
@@ -525,15 +1749,23 @@ export default function ProjectOverviewScreen() {
           onPress={() => void onSave()}
           disabled={saving}
           style={{
-            marginTop: 14,
-            minHeight: 48,
-            borderRadius: 12,
+            marginHorizontal: 14,
+            marginBottom: 14,
+            marginTop: 4,
+            height: 52,
+            borderRadius: 14,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: saving ? '#D1D5DB' : BRAND,
+            backgroundColor: saving ? MUTED_LIGHT : BRAND,
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{saving ? 'Saving...' : 'Save Overview'}</Text>
+          <Text style={{
+            color: '#FFFFFF',
+            fontWeight: '700',
+            fontSize: 15,
+          }}>
+            {saving ? 'Saving...' : 'Save Overview'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -643,117 +1875,6 @@ function SelectMetric({
   )
 }
 
-function SimpleChart({
-  rows,
-  color,
-  cumulativeColor,
-}: {
-  rows: Array<{ label: string; value: number }>
-  color: string
-  cumulativeColor: string
-}) {
-  const cumulative = cumulativeSeries(rows.map((r) => r.value))
-  return (
-    <LineChart
-      labels={rows.map((row) => row.label)}
-      series={[
-        { color, values: rows.map((row) => row.value) },
-        { color: cumulativeColor, values: cumulative },
-      ]}
-    />
-  )
-}
-
-function SimpleDualChart({ rows, labels }: { rows: StageRow[]; labels: string[] }) {
-  const cumulativeActual = cumulativeSeries(rows.map((r) => r.actual))
-  return (
-    <LineChart
-      labels={labels}
-      series={[
-        { color: '#60A5FA', values: rows.map((row) => row.estimate) },
-        { color: BRAND, values: rows.map((row) => row.actual) },
-        { color: '#059669', values: cumulativeActual },
-      ]}
-    />
-  )
-}
-
-function LineChart({
-  labels,
-  series,
-}: {
-  labels: string[]
-  series: Array<{ color: string; values: number[] }>
-}) {
-  const chartHeight = 160
-  const pointGap = 40
-  const chartWidth = Math.max(360, Math.max(1, labels.length - 1) * pointGap + 20)
-  const maxValue = Math.max(1, ...series.flatMap((item) => item.values))
-  const getPoint = (value: number, index: number) => {
-    const x = 10 + index * pointGap
-    const y = chartHeight - (value / maxValue) * (chartHeight - 20) - 10
-    return { x, y }
-  }
-
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <View style={{ paddingVertical: 8 }}>
-        <View style={{ width: chartWidth, height: chartHeight + 24, borderLeftWidth: 1, borderBottomWidth: 1, borderColor: '#E5E7EB' }}>
-          {series.map((item, sIdx) =>
-            item.values.map((value, idx) => {
-              const from = getPoint(value, idx)
-              const to = idx < item.values.length - 1 ? getPoint(item.values[idx + 1], idx + 1) : null
-              const line = to
-                ? {
-                    left: from.x,
-                    top: from.y,
-                    width: Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2),
-                    transform: [{ rotate: `${Math.atan2(to.y - from.y, to.x - from.x)}rad` }],
-                  }
-                : null
-              return (
-                <View key={`${sIdx}_${idx}`}>
-                  {line ? (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        height: 2,
-                        borderRadius: 2,
-                        backgroundColor: item.color,
-                        left: line.left,
-                        top: line.top,
-                        width: line.width,
-                        transform: line.transform,
-                      }}
-                    />
-                  ) : null}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: from.x - 3,
-                      top: from.y - 3,
-                      width: 6,
-                      height: 6,
-                      borderRadius: 6,
-                      backgroundColor: item.color,
-                    }}
-                  />
-                </View>
-              )
-            })
-          )}
-        </View>
-        <View style={{ flexDirection: 'row', marginTop: 4 }}>
-          {labels.map((label, index) => (
-            <Text key={`${label}_${index}`} style={{ width: pointGap, fontSize: 10, textAlign: 'center', color: '#6B7280' }}>
-              {label}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </ScrollView>
-  )
-}
 
 function KpiCard({
   title,
@@ -776,11 +1897,3 @@ function KpiCard({
   )
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      <View style={{ width: 8, height: 8, borderRadius: 99, backgroundColor: color }} />
-      <Text style={{ fontSize: 11, color: '#6B7280' }}>{label}</Text>
-    </View>
-  )
-}

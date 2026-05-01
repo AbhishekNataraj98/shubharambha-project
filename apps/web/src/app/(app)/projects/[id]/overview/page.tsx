@@ -1,20 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-
-type StageRow = {
-  stageKey: string
-  floorIndex: number
-  stageLabel: string
-  estimate: number
-  low: number
-  high: number
-  sr: number
-  actual: number
-}
 
 type OverviewPayload = {
   rows?: Array<{ stageKey: string; floorIndex: number; stageLabel: string; actualCost: number }>
@@ -54,6 +43,20 @@ const TIER_BANDS = {
 } as const
 
 type TierKey = keyof typeof TIER_BANDS
+
+const BRAND = '#D85A30'
+const BRAND_DARK = '#B8471F'
+const BRAND_LIGHT = '#FBF0EB'
+const BRAND_BORDER = '#F5DDD4'
+const CHARCOAL = '#2C2C2A'
+const PAGE_BG = '#F2EDE8'
+const CARD_BG = '#FFFFFF'
+const CARD_BORDER = '#E8DDD4'
+const MUTED = '#78716C'
+const MUTED_LIGHT = '#A8A29E'
+const BLUE = '#3B82F6'
+const GREEN = '#10B981'
+const RED = '#DC2626'
 
 const MATERIAL_INPUTS = [
   { key: 'cement', label: 'Cement (bags)', qtyPerSqft: 0.36, low: 360, mid: 395, high: 430 },
@@ -160,6 +163,391 @@ function buildPlan(areaSqft: number, costPerSqft: number, floors: number, tier: 
   }
 }
 
+type BarPair = { label: string; a: number; b: number }
+
+function WebSvgAreaChart({
+  values,
+  color,
+  labels,
+  height = 140,
+  showDots = true,
+}: {
+  values: number[]
+  color: string
+  labels: string[]
+  height?: number
+  showDots?: boolean
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(320)
+  const gid = useId().replace(/:/g, '_')
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setContainerWidth(Math.max(200, el.offsetWidth)))
+    ro.observe(el)
+    setContainerWidth(Math.max(200, el.offsetWidth))
+    return () => ro.disconnect()
+  }, [])
+
+  const PAD_L = 38
+  const PAD_R = 12
+  const PAD_T = 14
+  const PAD_B = 28
+  const plotW = containerWidth - PAD_L - PAD_R
+  const plotH = height - PAD_T - PAD_B
+  const n = values.length
+  const maxVal = Math.max(1, ...values)
+  const yTicks = [0, 0.33, 0.66, 1].map((t) => Math.round(t * maxVal))
+
+  const getX = (i: number) => PAD_L + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW)
+  const getY = (v: number) => PAD_T + plotH - (v / maxVal) * plotH
+
+  const pts = values.map((v, i) => `${getX(i)},${getY(v)}`).join(' ')
+  const areaPath =
+    n === 0
+      ? ''
+      : `M${getX(0)},${PAD_T + plotH} ${values.map((v, i) => `L${getX(i)},${getY(v)}`).join(' ')} L${getX(n - 1)},${PAD_T + plotH} Z`
+
+  const formatY = (v: number): string => {
+    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`
+    if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`
+    return `₹${v}`
+  }
+
+  return (
+    <div ref={wrapRef} className="w-full">
+      <svg width={containerWidth} height={height} className="block">
+        <defs>
+          <linearGradient id={`grad_${gid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={color} stopOpacity="0.25" />
+            <stop offset="1" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {yTicks.map((tick) => {
+          const y = getY(tick)
+          return (
+            <g key={tick}>
+              <line
+                x1={PAD_L}
+                y1={y}
+                x2={containerWidth - PAD_R}
+                y2={y}
+                stroke={PAGE_BG}
+                strokeWidth={1}
+                strokeDasharray={tick === 0 ? undefined : '3 3'}
+              />
+              <text x={PAD_L - 4} y={y + 4} fontSize={8} fill={MUTED_LIGHT} textAnchor="end">
+                {formatY(tick)}
+              </text>
+            </g>
+          )
+        })}
+        <line x1={PAD_L} y1={PAD_T + plotH} x2={containerWidth - PAD_R} y2={PAD_T + plotH} stroke={CARD_BORDER} strokeWidth={1} />
+        {areaPath ? <path d={areaPath} fill={`url(#grad_${gid})`} /> : null}
+        {n > 1 ? (
+          <polyline points={pts} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        ) : null}
+        {showDots
+          ? values.map((v, i) => (
+              <circle key={i} cx={getX(i)} cy={getY(v)} r={3.5} fill={CARD_BG} stroke={color} strokeWidth={2} />
+            ))
+          : null}
+        {labels.map((lbl, i) => {
+          const step = n > 10 ? 3 : n > 6 ? 2 : 1
+          if (i % step !== 0 && i !== n - 1) return null
+          return (
+            <text key={i} x={getX(i)} y={height - 4} fontSize={8} fill={MUTED_LIGHT} textAnchor="middle">
+              {lbl}
+            </text>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function WebSvgDualBarChart({
+  pairs,
+  colorA = BRAND,
+  colorB = BLUE,
+  labelA = 'Estimated',
+  labelB = 'Actual',
+  height = 170,
+}: {
+  pairs: BarPair[]
+  colorA?: string
+  colorB?: string
+  labelA?: string
+  labelB?: string
+  height?: number
+}) {
+  const [tooltip, setTooltip] = useState<{
+    x: number
+    y: number
+    value: number
+    color: string
+    barLabel: string
+    seriesLabel: string
+  } | null>(null)
+
+  const PAD_L = 42
+  const PAD_R = 8
+  const PAD_T = 16
+  const PAD_B = 32
+  const BAR_W = 10
+  const BAR_GAP = 3
+  const GROUP_GAP = 18
+  const GROUP_W = BAR_W * 2 + BAR_GAP + GROUP_GAP
+  const plotH = height - PAD_T - PAD_B
+  const svgW = PAD_L + pairs.length * GROUP_W + PAD_R + 16
+
+  const maxVal = Math.max(1, ...pairs.flatMap((p) => [p.a, p.b]))
+  const yMax = maxVal < 10000 ? Math.ceil(maxVal / 1000) * 1000 : Math.ceil(maxVal / 10000) * 10000
+  const yTicks: number[] = []
+  const tickCount = 4
+  for (let i = 0; i <= tickCount; i++) yTicks.push(Math.round((i / tickCount) * yMax))
+
+  const baseY = PAD_T + plotH
+  function bh(v: number) {
+    return Math.max(2, (v / yMax) * plotH)
+  }
+  function by(v: number) {
+    return baseY - bh(v)
+  }
+  function gx(i: number) {
+    return PAD_L + 8 + i * GROUP_W
+  }
+
+  const fmt = (v: number) => {
+    if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`
+    if (v >= 1000) return `₹${(v / 1000).toFixed(0)}K`
+    return `₹${v}`
+  }
+
+  const inrFmt = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  })
+
+  return (
+    <div>
+      <div className="mb-2.5 flex flex-wrap items-center gap-3.5 text-[10px]" style={{ color: MUTED }}>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: colorA }} />
+          {labelA}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: colorB }} />
+          {labelB}
+        </span>
+        <span className="ml-auto italic text-[9px]" style={{ color: MUTED_LIGHT }}>
+          Click bars for values
+        </span>
+      </div>
+
+      <div className="overflow-x-auto pb-1">
+        <svg width={svgW} height={height} className="block shrink-0">
+          {yTicks.map((tick) => {
+            const y = by(tick)
+            return (
+              <g key={tick}>
+                <line
+                  x1={PAD_L}
+                  y1={y}
+                  x2={svgW - PAD_R}
+                  y2={y}
+                  stroke={PAGE_BG}
+                  strokeWidth={1}
+                  strokeDasharray={tick === 0 ? undefined : '3 3'}
+                />
+                <text x={PAD_L - 4} y={y + 4} fontSize={8} fill={MUTED_LIGHT} textAnchor="end">
+                  {fmt(tick)}
+                </text>
+              </g>
+            )
+          })}
+          <line x1={PAD_L} y1={baseY} x2={svgW - PAD_R} y2={baseY} stroke={CARD_BORDER} strokeWidth={1} />
+
+          {pairs.map((pair, i) => {
+            const ax = gx(i)
+            const bx = ax + BAR_W + BAR_GAP
+            const dimA = tooltip && (tooltip.barLabel !== pair.label || tooltip.seriesLabel !== labelA)
+            const dimB = tooltip && (tooltip.barLabel !== pair.label || tooltip.seriesLabel !== labelB)
+
+            return (
+              <g key={`${pair.label}_${i}`}>
+                <rect
+                  role="button"
+                  tabIndex={0}
+                  x={ax}
+                  y={by(pair.a)}
+                  width={BAR_W}
+                  height={bh(pair.a)}
+                  rx={3}
+                  fill={colorA}
+                  opacity={dimA ? 0.3 : 1}
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (tooltip?.barLabel === pair.label && tooltip?.seriesLabel === labelA) setTooltip(null)
+                    else
+                      setTooltip({
+                        x: ax + BAR_W / 2,
+                        y: by(pair.a),
+                        value: pair.a,
+                        color: colorA,
+                        barLabel: pair.label,
+                        seriesLabel: labelA,
+                      })
+                  }}
+                />
+                <rect
+                  role="button"
+                  tabIndex={0}
+                  x={bx}
+                  y={by(pair.b)}
+                  width={BAR_W}
+                  height={bh(pair.b)}
+                  rx={3}
+                  fill={colorB}
+                  opacity={dimB ? 0.3 : 1}
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (tooltip?.barLabel === pair.label && tooltip?.seriesLabel === labelB) setTooltip(null)
+                    else
+                      setTooltip({
+                        x: bx + BAR_W / 2,
+                        y: by(pair.b),
+                        value: pair.b,
+                        color: colorB,
+                        barLabel: pair.label,
+                        seriesLabel: labelB,
+                      })
+                  }}
+                />
+                <text x={ax + BAR_W + BAR_GAP / 2} y={baseY + 14} fontSize={7} fill={MUTED_LIGHT} textAnchor="middle">
+                  {pair.label.length > 6 ? `${pair.label.slice(0, 5)}…` : pair.label}
+                </text>
+              </g>
+            )
+          })}
+
+          {tooltip
+            ? (() => {
+                const TW = 90
+                const TH = 42
+                const tx = Math.max(PAD_L, Math.min(tooltip.x - TW / 2, svgW - TW - PAD_R))
+                const ty = Math.max(PAD_T, tooltip.y - TH - 8)
+                return (
+                  <g>
+                    <rect x={tx} y={ty} width={TW} height={TH} rx={8} fill={CHARCOAL} opacity={0.95} />
+                    <text x={tx + TW / 2} y={ty + 14} fontSize={8} fill={tooltip.color} textAnchor="middle" fontWeight={700}>
+                      {tooltip.seriesLabel}
+                    </text>
+                    <text x={tx + TW / 2} y={ty + 30} fontSize={10} fill="#FFFFFF" textAnchor="middle" fontWeight={800}>
+                      {inrFmt.format(tooltip.value)}
+                    </text>
+                  </g>
+                )
+              })()
+            : null}
+        </svg>
+      </div>
+
+      {tooltip ? (
+        <button
+          type="button"
+          onClick={() => setTooltip(null)}
+          className="mx-auto mt-1 block rounded-full px-3 py-0.5 text-[9px]"
+          style={{ backgroundColor: PAGE_BG, color: MUTED }}
+        >
+          Click to dismiss
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function WebSvgDonutChart({
+  segments,
+  total,
+  size = 120,
+}: {
+  segments: Array<{ color: string; value: number; label: string }>
+  total: number
+  size?: number
+}) {
+  const cx = size / 2
+  const cy = size / 2
+  const R = size / 2 - 14
+  const strokeW = 14
+  const circumference = 2 * Math.PI * R
+
+  type DonutPath = { color: string; value: number; label: string; dash: number; gap: number; rotate: number }
+  const paths = segments.reduce(
+    (acc: { running: number; rows: DonutPath[] }, seg) => {
+      const frac = total > 0 ? seg.value / total : 0
+      const dash = frac * circumference
+      const gap = circumference - dash
+      const offset = acc.running
+      const rotate = -90 + (offset / circumference) * 360
+      acc.running += dash
+      acc.rows.push({ ...seg, dash, gap, rotate })
+      return acc
+    },
+    { running: 0, rows: [] as DonutPath[] }
+  ).rows
+
+  const fmt = (v: number) =>
+    v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : `₹${(v / 1000).toFixed(0)}K`
+
+  return (
+    <div className="flex flex-row flex-wrap items-center gap-3">
+      <svg width={size} height={size} className="shrink-0">
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke={PAGE_BG} strokeWidth={strokeW} />
+        {paths.map((seg, i) => (
+          <circle
+            key={i}
+            cx={cx}
+            cy={cy}
+            r={R}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={strokeW}
+            strokeDasharray={`${seg.dash} ${seg.gap}`}
+            transform={`rotate(${seg.rotate} ${cx} ${cy})`}
+          />
+        ))}
+        <text x={cx} y={cy - 6} textAnchor="middle" fontSize={11} fontWeight={800} fill={CHARCOAL}>
+          {fmt(total)}
+        </text>
+        <text x={cx} y={cy + 8} textAnchor="middle" fontSize={8} fill={MUTED}>
+          budget
+        </text>
+      </svg>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: seg.color }} />
+              <span className="truncate text-[9px]" style={{ color: MUTED }}>
+                {seg.label}
+              </span>
+            </span>
+            <span className="shrink-0 text-[9px] font-bold" style={{ color: CHARCOAL }}>
+              {fmt(seg.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ProjectOverviewPage() {
   const params = useParams<{ id: string }>()
   const projectId = params.id
@@ -183,14 +571,13 @@ export default function ProjectOverviewPage() {
   const numericOverhead = Math.max(0, Number(srOverheadPct) || 0)
   const numericGst = Math.max(0, Number(srGstPct) || 0)
 
-  const { totalBudget, lowTotal, highTotal, srTotal, materialTotals, rows } = useMemo(() => {
+  const { totalBudget, lowTotal, highTotal, srTotal, rows } = useMemo(() => {
     const plan = buildPlan(numericArea, numericCost, numericFloors, tier, numericOverhead, numericGst)
     return {
       totalBudget: plan.totalBudget,
       lowTotal: plan.lowTotal,
       highTotal: plan.highTotal,
       srTotal: plan.srTotal,
-      materialTotals: plan.materialTotals,
       rows: plan.rows.map((row) => ({ ...row, actual: savedActuals[row.stageKey] ?? 0 })),
     }
   }, [numericArea, numericCost, numericFloors, tier, numericOverhead, numericGst, savedActuals])
@@ -198,6 +585,7 @@ export default function ProjectOverviewPage() {
   const estimatedTotal = rows.reduce((sum, row) => sum + row.estimate, 0)
   const actualTotal = rows.reduce((sum, row) => sum + row.actual, 0)
   const variance = actualTotal - estimatedTotal
+  const stageCodes = rows.map((_, index) => `S${index + 1}`)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -225,7 +613,9 @@ export default function ProjectOverviewPage() {
   }, [projectId, supabase])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
   }, [load])
 
   const save = async () => {
@@ -253,37 +643,68 @@ export default function ProjectOverviewPage() {
     }
   }
 
-  const maxEstimate = Math.max(1, ...rows.map((r) => r.estimate))
-  const maxActual = Math.max(1, ...rows.map((r) => Math.max(r.estimate, r.actual)))
-  const cumulativeEstimate = cumulativeSeries(rows.map((r) => r.estimate))
-  const cumulativeActual = cumulativeSeries(rows.map((r) => r.actual))
-  const maxCumulativeEstimate = Math.max(1, ...cumulativeEstimate)
-  const maxCumulativeActual = Math.max(1, ...cumulativeActual)
-  const maxLowHigh = Math.max(1, ...rows.map((r) => r.high))
-  const maxSr = Math.max(1, ...rows.map((r) => r.sr))
-  const stageCodes = rows.map((_, index) => `S${index + 1}`)
-  const chartCols = `repeat(${Math.max(rows.length, 1)}, minmax(30px, 1fr))`
+  const srItemProjected = (item: (typeof SR_ITEMS)[number]) =>
+    item.srRate * item.qtyPer1000Sqft * (numericArea / 1000) * (1 + numericOverhead / 100 + numericGst / 100)
 
-  if (loading) return <div className="mx-auto min-h-screen w-full max-w-md p-4 text-sm text-gray-500">Loading...</div>
+  const maxSrBreakdown = Math.max(
+    1,
+    ...SR_ITEMS.map((item) => item.srRate * item.qtyPer1000Sqft * (numericArea / 1000))
+  )
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm" style={{ backgroundColor: PAGE_BG, color: MUTED }}>
+        Loading...
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-[#F7F7F5] p-4 pb-20">
-      <div className="mx-auto mb-3 flex w-full max-w-6xl items-center gap-2">
-        <Link href={`/projects/${projectId}`} className="rounded-md px-2 py-1 text-sm text-orange-700 hover:bg-orange-50">
-          ← Back
-        </Link>
-        <h1 className="text-2xl font-extrabold text-gray-900">Project Overview</h1>
-      </div>
+    <div className="min-h-screen pb-10" style={{ backgroundColor: PAGE_BG }}>
+      <div className="mx-auto w-full max-w-lg px-3.5 pt-3">
+        <header className="-mx-3.5 rounded-b-none px-3.5 pb-4 pt-3.5" style={{ backgroundColor: CHARCOAL }}>
+          <div className="mb-2 flex items-center gap-2">
+            <Link href={`/projects/${projectId}`} className="text-sm text-white/70 transition hover:text-white">
+              ← Back
+            </Link>
+          </div>
+          <h1 className="text-xl font-extrabold text-white">Project Overview</h1>
+          <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[
+              ['market', 'Market'],
+              ['sr', 'PWD SR'],
+              ['building', 'Building'],
+              ['tracking', 'Tracker'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveTab(key as typeof activeTab)}
+                className="shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition"
+                style={{
+                  backgroundColor: activeTab === key ? BRAND : 'rgba(255,255,255,0.12)',
+                  border: `0.5px solid ${activeTab === key ? BRAND : 'rgba(255,255,255,0.2)'}`,
+                  color: activeTab === key ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </header>
 
-      <div className="mx-auto grid w-full max-w-6xl gap-4 lg:grid-cols-[280px,1fr]">
-        <aside className="rounded-2xl border border-orange-100 bg-[#FFF8F3] p-4 shadow-sm lg:sticky lg:top-20 lg:self-start">
-          <p className="text-sm font-bold text-gray-800">Project Parameters</p>
-          <div className="mt-3 space-y-3">
-            <SelectField
-              label="Cost tier"
+        <section
+          className="mt-3.5 rounded-[14px] border p-3"
+          style={{ borderColor: BRAND_BORDER, backgroundColor: BRAND_LIGHT }}
+        >
+          <p className="mb-2.5 text-[11px] font-bold tracking-wide" style={{ color: MUTED }}>
+            PROJECT PARAMETERS
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <TierSelect
+              label="Tier"
               value={tier}
-              onChange={(v) => {
-                const next = v as TierKey
+              onChange={(next) => {
                 setTier(next)
                 setCostPerSqft(String(TIER_BANDS[next].reference))
               }}
@@ -293,229 +714,393 @@ export default function ProjectOverviewPage() {
                 { value: 'high', label: 'High' },
               ]}
             />
-            <Metric label="Cost / sqft" value={costPerSqft} onChange={setCostPerSqft} />
-            <Metric label="Area (sqft)" value={areaSqft} onChange={setAreaSqft} />
-            <Metric label="Floors" value={floors} onChange={setFloors} />
             <Metric label="SR overhead %" value={srOverheadPct} onChange={setSrOverheadPct} />
             <Metric label="SR GST %" value={srGstPct} onChange={setSrGstPct} />
           </div>
-          <div className="mt-4 rounded-xl border border-orange-200 bg-white p-3">
-            <p className="text-xs font-semibold text-gray-500">Total Stages</p>
-            <p className="text-lg font-extrabold text-gray-900">{rows.length}</p>
-            <p className="mt-2 text-xs font-semibold text-gray-500">Total Estimate</p>
-            <p className="text-base font-bold text-[#D85A30]">{formatINR(estimatedTotal)}</p>
-            <p className="mt-2 text-xs font-semibold text-gray-500">Tier range</p>
-            <p className="text-xs font-semibold text-gray-700">
-              {formatINR(lowTotal)} to {formatINR(highTotal)}
-            </p>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <Metric label="Cost / sqft" value={costPerSqft} onChange={setCostPerSqft} />
+            <Metric label="Area (sqft)" value={areaSqft} onChange={setAreaSqft} />
+            <Metric label="Floors" value={floors} onChange={setFloors} />
           </div>
-        </aside>
+        </section>
 
-        <main className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {[
-              ['market', 'Market Estimate'],
-              ['sr', 'PWD SR rate/sqft'],
-              ['building', 'Individual Building'],
-              ['tracking', 'Live Tracker'],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key as typeof activeTab)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                  activeTab === key ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 border border-gray-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="mt-3.5 flex gap-2">
+          <KpiCard title="Est. Budget" value={formatINR(totalBudget)} tint="#EFF6FF" border="#BFDBFE" text="#1E3A8A" />
+          <KpiCard title="Actual Spent" value={formatINR(actualTotal)} tint={BRAND_LIGHT} border={BRAND_BORDER} text={BRAND_DARK} />
+          <KpiCard
+            title="Variance"
+            value={`${variance >= 0 ? '+' : ''}${formatINR(variance)}`}
+            tint={variance > 0 ? '#FEF2F2' : variance < 0 ? '#ECFDF5' : PAGE_BG}
+            border={variance > 0 ? '#FECACA' : variance < 0 ? '#BBF7D0' : CARD_BORDER}
+            text={variance > 0 ? RED : variance < 0 ? '#166534' : MUTED}
+          />
+        </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <KpiCard title="Estimated Budget" value={formatINR(totalBudget)} tone="blue" />
-            <KpiCard title="Actual Spent" value={formatINR(actualTotal)} tone="orange" />
-            <KpiCard
-              title="Cost Variance"
-              value={`${variance >= 0 ? '+' : '-'}${formatINR(Math.abs(variance))}`}
-              tone={variance > 0 ? 'red' : variance < 0 ? 'green' : 'slate'}
-            />
-          </div>
-
-          {activeTab === 'market' ? (
-            <>
-          <div className="grid gap-4 xl:grid-cols-2">
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-lg font-bold text-gray-900">Cost Projection Timeline</p>
-              <div className="flex flex-wrap gap-3 text-xs text-gray-600">
-                <LegendDot colorClass="bg-emerald-500" label="Low band" />
-                <LegendDot colorClass="bg-sky-500" label="Estimated" />
-                <LegendDot colorClass="bg-amber-500" label="High band" />
-              </div>
-            </div>
-            <LineSeriesChart
-              labels={stageCodes}
-              series={[
-                { label: 'Low', color: '#22C55E', values: rows.map((row) => row.low) },
-                { label: 'Estimated', color: '#0EA5E9', values: rows.map((row) => row.estimate) },
-                { label: 'High', color: '#F59E0B', values: rows.map((row) => row.high) },
-              ]}
-            />
+        {activeTab === 'market' ? (
+          <div className="mt-3 space-y-3">
+            <section className="rounded-[14px] border p-3.5" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+              <p className="mb-3.5 text-xs font-bold" style={{ color: CHARCOAL }}>
+                Budget Breakdown
+              </p>
+              <WebSvgDonutChart
+                total={totalBudget}
+                segments={[
+                  { color: BRAND, value: totalBudget * 0.35, label: 'Structure (35%)' },
+                  { color: '#F59E0B', value: totalBudget * 0.2, label: 'Masonry (20%)' },
+                  { color: BLUE, value: totalBudget * 0.25, label: 'Finishing (25%)' },
+                  { color: GREEN, value: totalBudget * 0.2, label: 'Others (20%)' },
+                ]}
+              />
             </section>
 
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-lg font-bold text-gray-900">Actual vs Estimated</p>
-              <div className="flex flex-wrap gap-3 text-xs text-gray-600">
-                <LegendDot colorClass="bg-sky-500" label="Estimated" />
-                <LegendDot colorClass="bg-orange-500" label="Actual" />
-                <LegendDot colorClass="bg-blue-800" label="PWD SR" />
+            <section className="rounded-[14px] border p-3.5" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+              <div className="mb-2.5 flex items-center justify-between">
+                <p className="text-xs font-bold" style={{ color: CHARCOAL }}>
+                  Cost Projection Timeline
+                </p>
+                <p className="text-[9px] italic" style={{ color: MUTED_LIGHT }}>
+                  Cumulative
+                </p>
               </div>
-            </div>
-            <LineSeriesChart
-              labels={stageCodes}
-              series={[
-                { label: 'Estimated', color: '#0EA5E9', values: rows.map((row) => row.estimate) },
-                { label: 'Actual', color: '#F97316', values: rows.map((row) => row.actual) },
-                { label: 'PWD SR', color: '#1E40AF', values: rows.map((row) => row.sr) },
-              ]}
-            />
+              <WebSvgAreaChart
+                values={cumulativeSeries(rows.map((r) => r.estimate))}
+                labels={stageCodes}
+                color={BRAND}
+                height={140}
+              />
+              <div className="mt-2 rounded-lg p-2 text-center text-[10px]" style={{ backgroundColor: PAGE_BG, color: MUTED }}>
+                Range band: {formatINR(lowTotal)} — {formatINR(highTotal)}
+              </div>
+            </section>
+
+            <section className="rounded-[14px] border p-3.5" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+              <p className="mb-0.5 text-xs font-bold" style={{ color: CHARCOAL }}>
+                Estimated vs Actual per Stage
+              </p>
+              <WebSvgDualBarChart
+                pairs={rows.map((r, i) => ({
+                  label: stageCodes[i] ?? `S${i + 1}`,
+                  a: r.estimate,
+                  b: r.actual,
+                }))}
+                colorA={BRAND}
+                colorB={BLUE}
+                labelA="Estimated"
+                labelB="Actual"
+                height={170}
+              />
             </section>
           </div>
-            </>
-          ) : null}
+        ) : null}
 
-          {activeTab === 'sr' ? (
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="mb-2 text-lg font-bold text-gray-900">PWD SR rate / sqft analysis</p>
-              <div className="mb-3 grid gap-3 sm:grid-cols-3">
-                <KpiCard title="PWD SR total" value={formatINR(srTotal)} tone="slate" />
-                <KpiCard title="PWD SR rate/sqft" value={formatINR(srTotal / numericArea)} tone="blue" />
-                <KpiCard title="Market premium" value={formatINR(totalBudget - srTotal)} tone={totalBudget - srTotal >= 0 ? 'red' : 'green'} />
+        {activeTab === 'sr' ? (
+          <div className="mt-3 space-y-3">
+            <section className="rounded-[14px] p-3.5" style={{ backgroundColor: CHARCOAL }}>
+              <p className="mb-2.5 text-[10px] font-bold tracking-wide text-white/40">MARKET vs PWD SR</p>
+              <div className="flex gap-2.5">
+                <div className="flex flex-1 flex-col items-center rounded-[10px] p-2.5" style={{ backgroundColor: 'rgba(216,90,48,0.2)' }}>
+                  <span className="text-[9px] text-white/50">Market rate</span>
+                  <span className="mt-0.5 text-lg font-extrabold" style={{ color: BRAND }}>
+                    {formatINR(totalBudget)}
+                  </span>
+                  <span className="mt-0.5 text-[9px] text-white/40">{formatINR(numericCost)}/sqft</span>
+                </div>
+                <div className="flex flex-1 flex-col items-center rounded-[10px] p-2.5" style={{ backgroundColor: 'rgba(59,130,246,0.2)' }}>
+                  <span className="text-[9px] text-white/50">PWD SR</span>
+                  <span className="mt-0.5 text-lg font-extrabold text-[#93C5FD]">{formatINR(srTotal)}</span>
+                  <span className="mt-0.5 text-[9px] text-white/40">{formatINR(srTotal / numericArea)}/sqft</span>
+                </div>
               </div>
-              <div className="overflow-x-auto rounded-xl border border-gray-100">
-                <table className="min-w-full text-xs">
-                  <thead className="bg-slate-50 text-slate-600">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Item</th>
-                      <th className="px-3 py-2 text-left">SR rate</th>
-                      <th className="px-3 py-2 text-left">Qty/1000 sqft</th>
-                      <th className="px-3 py-2 text-left">Projected cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {SR_ITEMS.map((item) => (
-                      <tr key={item.item} className="border-t border-gray-100">
-                        <td className="px-3 py-2">{item.item}</td>
-                        <td className="px-3 py-2">{formatINR(item.srRate)}</td>
-                        <td className="px-3 py-2">{item.qtyPer1000Sqft}</td>
-                        <td className="px-3 py-2">{formatINR(item.srRate * item.qtyPer1000Sqft * (numericArea / 1000) * (1 + numericOverhead / 100 + numericGst / 100))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="mt-2.5 rounded-lg p-2 text-center text-[11px] font-bold" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: GREEN }}>
+                Premium over SR: {formatINR(totalBudget - srTotal)}
               </div>
             </section>
-          ) : null}
 
-          {activeTab === 'building' ? (
-            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="mb-2 text-lg font-bold text-gray-900">Individual Building Estimation</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {ROOM_PRESETS.map((room) => {
-                  const marketCost = room.area * numericFloors * numericCost * room.factor
-                  const srCost = room.area * numericFloors * (srTotal / numericArea) * room.factor
+            <section className="rounded-[14px] border p-3.5" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+              <p className="mb-3 text-xs font-bold" style={{ color: CHARCOAL }}>
+                PWD SR Breakdown
+              </p>
+              <div className="space-y-2.5">
+                {SR_ITEMS.map((item) => {
+                  const itemTotalRaw = item.srRate * item.qtyPer1000Sqft * (numericArea / 1000)
+                  const pct = itemTotalRaw / maxSrBreakdown
+                  const projected = srItemProjected(item)
                   return (
-                    <div key={room.name} className="rounded-lg border border-gray-200 bg-slate-50 p-3">
-                      <p className="text-sm font-semibold text-gray-900">{room.name}</p>
-                      <p className="text-xs text-gray-600">{room.area} sqft / floor · factor {room.factor}x</p>
-                      <div className="mt-2 flex items-center justify-between text-xs">
-                        <span className="text-gray-500">Market</span>
-                        <span className="font-semibold text-sky-700">{formatINR(marketCost)}</span>
+                    <div key={item.item}>
+                      <div className="mb-1 flex justify-between gap-2">
+                        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold" style={{ color: CHARCOAL }}>
+                          {item.item}
+                        </span>
+                        <span className="shrink-0 text-[11px] font-bold" style={{ color: BRAND }}>
+                          {formatINR(projected)}
+                        </span>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-xs">
-                        <span className="text-gray-500">PWD SR</span>
-                        <span className="font-semibold text-blue-800">{formatINR(srCost)}</span>
+                      <div className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: PAGE_BG }}>
+                        <div className="h-full rounded-full" style={{ width: `${pct * 100}%`, backgroundColor: BRAND }} />
                       </div>
+                      <p className="mt-0.5 text-[9px]" style={{ color: MUTED_LIGHT }}>
+                        SR {formatINR(item.srRate)} · Qty {item.qtyPer1000Sqft}/1000sqft ({item.unit})
+                      </p>
                     </div>
                   )
                 })}
               </div>
             </section>
-          ) : null}
+          </div>
+        ) : null}
 
-          {activeTab === 'tracking' ? (
-            <>
-          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="mb-2 text-sm font-bold text-gray-800">Stage Code Legend</p>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {rows.map((row, index) => (
-                <div key={`${row.stageKey}_legend`} className="flex items-center gap-2 rounded-md bg-slate-50 px-2 py-1.5">
-                  <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">{`S${index + 1}`}</span>
-                  <span className="truncate text-xs text-slate-700">{row.stageLabel}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="mb-3 text-lg font-bold text-gray-900">Stage-wise Tracking</p>
-            <div className="max-h-[460px] overflow-auto rounded-xl border border-gray-100">
-              {rows.map((row, index) => {
-                const delta = row.actual - row.estimate
-                return (
-                  <div key={row.stageKey} className="grid grid-cols-[56px,1fr] items-start gap-3 border-b border-gray-100 p-3 last:border-b-0">
-                    <span className="rounded-lg bg-slate-100 px-2 py-1 text-center text-xs font-bold text-slate-600">{`S${index + 1}`}</span>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{row.stageLabel}</p>
-                      <p className="text-xs text-gray-500">Estimated: {formatINR(row.estimate)} · PWD SR: {formatINR(row.sr)}</p>
-                      <p className="text-[11px] text-gray-500">Range: {formatINR(row.low)} to {formatINR(row.high)}</p>
-                      <input
-                        value={row.actual ? String(Math.round(row.actual)) : ''}
-                        onChange={(e) => {
-                          const parsed = Number(e.target.value.replace(/[^\d]/g, ''))
-                          setSavedActuals((prev) => ({ ...prev, [row.stageKey]: Number.isFinite(parsed) ? parsed : 0 }))
-                        }}
-                        placeholder="Enter actual amount"
-                        className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-orange-300 focus:outline-none"
-                      />
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className={`text-xs font-semibold ${delta > 0 ? 'text-red-700' : delta < 0 ? 'text-emerald-700' : 'text-gray-500'}`}>
-                          Variance: {delta > 0 ? '+' : ''}
-                          {formatINR(delta)}
-                        </p>
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                            row.actual === 0
-                              ? 'bg-gray-100 text-gray-500'
-                              : delta > 0
-                                ? 'bg-red-100 text-red-700'
-                                : delta < 0
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {row.actual === 0 ? 'Pending' : delta > 0 ? 'Over budget' : delta < 0 ? 'Under budget' : 'On budget'}
+        {activeTab === 'building' ? (
+          <div className="mt-3 space-y-2.5">
+            {ROOM_PRESETS.map((room) => {
+              const marketCost = room.area * numericFloors * numericCost * room.factor
+              const srCost = room.area * numericFloors * (srTotal / numericArea) * room.factor
+              const saving = marketCost - srCost
+              return (
+                <article key={room.name} className="overflow-hidden rounded-[14px] border" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+                  <div className="flex items-center justify-between px-3.5 py-2.5" style={{ backgroundColor: CHARCOAL }}>
+                    <span className="text-xs font-bold text-white">{room.name}</span>
+                    <span className="text-[10px] text-white/50">
+                      {room.area} sqft · {room.factor}x
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <div className="mb-2.5 flex gap-2">
+                      <div
+                        className="flex h-11 w-[52px] shrink-0 flex-col items-center justify-center rounded-md border-[1.5px]"
+                        style={{ borderColor: BRAND, backgroundColor: BRAND_LIGHT }}
+                      >
+                        <span className="text-[10px] font-bold" style={{ color: BRAND }}>
+                          {room.area}
                         </span>
+                        <span className="mt-px text-[7px]" style={{ color: MUTED_LIGHT }}>
+                          sqft
+                        </span>
+                      </div>
+                      <p className="flex flex-1 items-center text-[10px] leading-snug" style={{ color: MUTED }}>
+                        Estimated allocation from total area × floors × rate × factor.
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <div className="flex flex-1 flex-col items-center rounded-lg p-2" style={{ backgroundColor: BRAND_LIGHT }}>
+                        <span className="text-[8px]" style={{ color: MUTED }}>
+                          Market
+                        </span>
+                        <span className="mt-0.5 text-xs font-extrabold" style={{ color: BRAND }}>
+                          {formatINR(marketCost)}
+                        </span>
+                      </div>
+                      <div className="flex flex-1 flex-col items-center rounded-lg p-2" style={{ backgroundColor: '#EFF6FF' }}>
+                        <span className="text-[8px]" style={{ color: MUTED }}>
+                          PWD SR
+                        </span>
+                        <span className="mt-0.5 text-xs font-extrabold text-[#1D4ED8]">{formatINR(srCost)}</span>
+                      </div>
+                      <div className="flex flex-1 flex-col items-center rounded-lg p-2" style={{ backgroundColor: '#ECFDF5' }}>
+                        <span className="text-[8px]" style={{ color: MUTED }}>
+                          Saving
+                        </span>
+                        <span className="mt-0.5 text-xs font-extrabold text-[#166534]">{formatINR(saving)}</span>
                       </div>
                     </div>
                   </div>
-                )
-              })}
+                </article>
+              )
+            })}
+            <div className="flex items-center justify-between rounded-xl px-3 py-3" style={{ backgroundColor: CHARCOAL }}>
+              <span className="text-xs font-bold text-white">
+                Total ({ROOM_PRESETS.length} rooms)
+              </span>
+              <div className="text-right">
+                <p className="text-base font-extrabold" style={{ color: BRAND }}>
+                  {formatINR(totalBudget)}
+                </p>
+                <p className="mt-px text-[9px] text-white/40">market rate</p>
+              </div>
             </div>
-          </section>
-            </>
-          ) : null}
+          </div>
+        ) : null}
 
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
-          <button
-            onClick={() => void save()}
-            disabled={saving}
-            className="w-full rounded-xl bg-[#D85A30] py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:opacity-60"
-          >
-            {saving ? 'Saving...' : 'Save Overview'}
-          </button>
-        </main>
+        {activeTab === 'tracking' ? (
+          <div className="mt-3 space-y-2.5">
+            <div className="flex gap-2">
+              {[
+                {
+                  count: rows.filter((r) => r.actual > 0 && r.actual < r.estimate).length,
+                  label: 'Under',
+                  bg: '#DCFCE7',
+                  border: '#BBF7D0',
+                  color: '#166534',
+                },
+                {
+                  count: rows.filter((r) => r.actual > r.estimate).length,
+                  label: 'Over',
+                  bg: '#FEE2E2',
+                  border: '#FECACA',
+                  color: RED,
+                },
+                {
+                  count: rows.filter((r) => r.actual === 0).length,
+                  label: 'Pending',
+                  bg: PAGE_BG,
+                  border: CARD_BORDER,
+                  color: MUTED_LIGHT,
+                },
+              ].map((pill) => (
+                <div
+                  key={pill.label}
+                  className="flex flex-1 flex-col items-center rounded-[10px] border py-2"
+                  style={{ backgroundColor: pill.bg, borderColor: pill.border }}
+                >
+                  <span className="text-base font-extrabold" style={{ color: pill.color }}>
+                    {pill.count}
+                  </span>
+                  <span className="mt-px text-[9px]" style={{ color: pill.color }}>
+                    {pill.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {rows.map((row, index) => {
+              const delta = row.actual - row.estimate
+              const isOver = row.actual > 0 && delta > 0
+              const isUnder = row.actual > 0 && delta < 0
+              const isPending = row.actual === 0
+              const headerBg = isOver ? RED : isUnder ? '#166534' : CHARCOAL
+              const badgeText = isPending ? 'Pending' : isOver ? '⚠️ Over budget' : isUnder ? '✓ Under budget' : '= On budget'
+              const badgeBg = 'rgba(255,255,255,0.2)'
+
+              return (
+                <article key={row.stageKey} className="overflow-hidden rounded-[14px] border" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5" style={{ backgroundColor: headerBg }}>
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md bg-white/20">
+                        <span className="text-[8px] font-extrabold text-white">{`S${index + 1}`}</span>
+                      </div>
+                      <span className="truncate text-xs font-bold text-white">{row.stageLabel}</span>
+                    </div>
+                    <span className="shrink-0 rounded-lg px-2 py-0.5 text-[8px] font-bold text-white" style={{ backgroundColor: badgeBg }}>
+                      {badgeText}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <div className="mb-2.5 flex gap-1.5">
+                      <div className="flex flex-1 flex-col items-center rounded-lg py-1.5" style={{ backgroundColor: PAGE_BG }}>
+                        <span className="text-[7px]" style={{ color: MUTED_LIGHT }}>
+                          Estimated
+                        </span>
+                        <span className="mt-0.5 text-[10px] font-extrabold" style={{ color: CHARCOAL }}>
+                          {formatINR(row.estimate)}
+                        </span>
+                      </div>
+                      <div
+                        className="flex flex-1 flex-col items-center rounded-lg py-1.5"
+                        style={{
+                          backgroundColor: isPending ? PAGE_BG : isOver ? '#FEE2E2' : '#DCFCE7',
+                        }}
+                      >
+                        <span className="text-[7px]" style={{ color: MUTED_LIGHT }}>
+                          Actual
+                        </span>
+                        <span
+                          className="mt-0.5 text-[10px] font-extrabold"
+                          style={{
+                            color: isPending ? MUTED_LIGHT : isOver ? RED : '#166534',
+                          }}
+                        >
+                          {isPending ? '—' : formatINR(row.actual)}
+                        </span>
+                      </div>
+                      <div
+                        className="flex flex-1 flex-col items-center rounded-lg py-1.5"
+                        style={{
+                          backgroundColor: isPending ? PAGE_BG : isOver ? '#FEE2E2' : '#DCFCE7',
+                        }}
+                      >
+                        <span className="text-[7px]" style={{ color: MUTED_LIGHT }}>
+                          Variance
+                        </span>
+                        <span
+                          className="mt-0.5 text-[10px] font-extrabold"
+                          style={{
+                            color: isPending ? MUTED_LIGHT : isOver ? RED : '#166534',
+                          }}
+                        >
+                          {isPending ? '—' : `${delta > 0 ? '+' : ''}${formatINR(delta)}`}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mb-2 text-[9px]" style={{ color: MUTED_LIGHT }}>
+                      Range: {formatINR(row.low)} – {formatINR(row.high)} · SR: {formatINR(row.sr)}
+                    </p>
+
+                    {!isPending ? (
+                      <div className="mb-2.5 space-y-1">
+                        <div>
+                          <div className="mb-0.5 flex justify-between text-[8px]" style={{ color: MUTED_LIGHT }}>
+                            <span>Estimated</span>
+                            <span style={{ color: BRAND }}>
+                              {Math.round((row.estimate / Math.max(row.estimate, row.actual)) * 100)}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: PAGE_BG }}>
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.min(100, (row.estimate / Math.max(row.estimate, row.actual)) * 100)}%`,
+                                backgroundColor: BRAND,
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="mb-0.5 flex justify-between text-[8px]" style={{ color: MUTED_LIGHT }}>
+                            <span>Actual</span>
+                            <span style={{ color: isOver ? RED : '#166534' }}>
+                              {Math.round((row.actual / Math.max(row.estimate, row.actual)) * 100)}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: PAGE_BG }}>
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.min(100, (row.actual / Math.max(row.estimate, row.actual)) * 100)}%`,
+                                backgroundColor: isOver ? RED : '#166534',
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <input
+                      value={row.actual ? String(Math.round(row.actual)) : ''}
+                      onChange={(e) => {
+                        const parsed = Number(e.target.value.replace(/[^\d]/g, ''))
+                        setSavedActuals((prev) => ({ ...prev, [row.stageKey]: Number.isFinite(parsed) ? parsed : 0 }))
+                      }}
+                      placeholder="Enter actual amount"
+                      className="h-10 w-full rounded-[10px] border px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-orange-300/40"
+                      style={{ borderColor: CARD_BORDER, backgroundColor: PAGE_BG, color: CHARCOAL }}
+                    />
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        ) : null}
+
+        {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saving}
+          className="mt-4 w-full rounded-[14px] py-3.5 text-[15px] font-bold text-white shadow-sm transition disabled:opacity-60"
+          style={{ backgroundColor: saving ? MUTED_LIGHT : BRAND }}
+        >
+          {saving ? 'Saving...' : 'Save Overview'}
+        </button>
       </div>
     </div>
   )
@@ -524,123 +1109,98 @@ export default function ProjectOverviewPage() {
 function KpiCard({
   title,
   value,
-  tone,
+  tint,
+  border,
+  text,
 }: {
   title: string
   value: string
-  tone: 'blue' | 'orange' | 'green' | 'red' | 'slate'
+  tint: string
+  border: string
+  text: string
 }) {
-  const tones: Record<typeof tone, string> = {
-    blue: 'border-sky-200 bg-sky-50 text-sky-800',
-    orange: 'border-orange-200 bg-orange-50 text-orange-800',
-    green: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    red: 'border-red-200 bg-red-50 text-red-800',
-    slate: 'border-slate-200 bg-slate-50 text-slate-800',
-  }
   return (
-    <div className={`rounded-xl border p-3 shadow-sm ${tones[tone]}`}>
-      <p className="text-xs font-semibold">{title}</p>
-      <p className="mt-1 text-xl font-extrabold">{value}</p>
-    </div>
-  )
-}
-
-function LineSeriesChart({
-  labels,
-  series,
-}: {
-  labels: string[]
-  series: Array<{ label: string; color: string; values: number[] }>
-}) {
-  const chartHeight = 220
-  const width = Math.max(880, labels.length * 52)
-  const maxVal = Math.max(1, ...series.flatMap((item) => item.values))
-  const xStep = labels.length > 1 ? width / (labels.length - 1) : width
-
-  const pointsFor = (values: number[]) =>
-    values.map((value, idx) => {
-      const x = idx * xStep
-      const y = chartHeight - (value / maxVal) * (chartHeight - 20) - 10
-      return { x, y, value }
-    })
-
-  const pathFor = (values: number[]) =>
-    pointsFor(values)
-      .map((pt, idx) => `${idx === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`)
-      .join(' ')
-
-  return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[880px]">
-        <svg width={width} height={chartHeight + 16} className="border-b border-l border-gray-200 bg-gradient-to-b from-slate-50 to-white">
-          {series.map((item) => (
-            <path key={item.label} d={pathFor(item.values)} fill="none" stroke={item.color} strokeWidth="2.5" />
-          ))}
-          {series.map((item) =>
-            pointsFor(item.values).map((pt, idx) => (
-              <circle key={`${item.label}_${idx}`} cx={pt.x} cy={pt.y} r="3" fill={item.color} />
-            ))
-          )}
-        </svg>
-        <div className="mt-2 grid px-1" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(40px, 1fr))` }}>
-          {labels.map((label) => (
-            <p key={label} className="text-center text-[11px] font-semibold text-gray-500">
-              {label}
-            </p>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function LegendDot({ colorClass, label }: { colorClass: string; label: string }) {
-  return (
-    <div className="inline-flex items-center gap-1">
-      <span className={`h-2 w-2 rounded-full ${colorClass}`} />
-      <span>{label}</span>
+    <div className="flex-1 rounded-xl border p-2.5" style={{ borderColor: border, backgroundColor: tint }}>
+      <p className="text-[10px] font-bold" style={{ color: '#6B7280' }}>
+        {title}
+      </p>
+      <p className="mt-1 text-[15px] font-black leading-tight" style={{ color: text }}>
+        {value}
+      </p>
     </div>
   )
 }
 
 function Metric({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <div>
-      <p className="mb-1 text-[11px] font-bold text-gray-600">{label}</p>
+    <div className="min-w-0 flex-1">
+      <p className="mb-1 text-[11px] font-bold" style={{ color: '#6B7280' }}>
+        {label}
+      </p>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ''))}
-        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-orange-300 focus:outline-none"
+        className="h-10 w-full min-w-0 rounded-[10px] border px-2.5 text-[13px] font-bold outline-none focus:border-orange-300"
+        style={{ borderColor: '#E5E7EB', backgroundColor: CARD_BG, color: CHARCOAL }}
       />
     </div>
   )
 }
 
-function SelectField({
+function TierSelect({
   label,
   value,
   onChange,
   options,
 }: {
   label: string
-  value: string
-  onChange: (v: string) => void
-  options: Array<{ value: string; label: string }>
+  value: TierKey
+  onChange: (v: TierKey) => void
+  options: Array<{ value: TierKey; label: string }>
 }) {
+  const [open, setOpen] = useState(false)
+  const selected = options.find((opt) => opt.value === value)?.label ?? 'Select'
+
   return (
-    <div>
-      <p className="mb-1 text-[11px] font-bold text-gray-600">{label}</p>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-orange-300 focus:outline-none"
+    <div className="relative min-w-0 flex-1">
+      <p className="mb-1 text-[11px] font-bold" style={{ color: '#6B7280' }}>
+        {label}
+      </p>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-10 w-full min-w-0 items-center justify-between rounded-[10px] border px-2.5 text-left text-xs font-bold outline-none focus:border-orange-300"
+        style={{ borderColor: '#E5E7EB', backgroundColor: CARD_BG, color: '#374151' }}
       >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        <span className="truncate">{selected}</span>
+        <span className="shrink-0 text-[#6B7280]">{open ? '▲' : '▼'}</span>
+      </button>
+      {open ? (
+        <ul
+          className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-[10px] border shadow-md"
+          style={{ borderColor: '#E5E7EB', backgroundColor: CARD_BG }}
+        >
+          {options.map((opt) => (
+            <li key={opt.value}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(opt.value)
+                  setOpen(false)
+                }}
+                className="w-full border-b px-2.5 py-2.5 text-left text-xs font-bold last:border-b-0"
+                style={{
+                  borderColor: PAGE_BG,
+                  backgroundColor: value === opt.value ? '#FFF7ED' : CARD_BG,
+                  color: value === opt.value ? '#9A3412' : '#374151',
+                }}
+              >
+                {opt.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   )
 }

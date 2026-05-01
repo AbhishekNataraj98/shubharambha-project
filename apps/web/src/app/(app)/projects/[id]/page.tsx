@@ -34,6 +34,30 @@ function isGenericRoleName(name: string | null | undefined) {
   return normalized === 'worker' || normalized === 'contractor' || normalized === 'professional'
 }
 
+function stageProgressWidth(stage: string): string {
+  const map: Record<string, string> = {
+    foundation: '10%',
+    plinth: '25%',
+    walls: '45%',
+    slab: '60%',
+    plastering: '80%',
+    finishing: '100%',
+  }
+  return map[stage] ?? '10%'
+}
+
+function stageProgressPercent(stage: string): number {
+  const map: Record<string, number> = {
+    foundation: 10,
+    plinth: 25,
+    walls: 45,
+    slab: 60,
+    plastering: 80,
+    finishing: 100,
+  }
+  return map[stage] ?? 10
+}
+
 export default async function ProjectDetailPage({
   params,
   searchParams,
@@ -146,47 +170,56 @@ export default async function ProjectDetailPage({
       </header>
 
       <div className="mx-auto w-full max-w-md">
-        <section className="relative mx-4 mt-3 rounded-xl border border-gray-100 border-l-4 border-l-orange-500 bg-white p-3">
-          <span
-            className={`absolute top-2.5 right-2.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-              statusBadgeClass[effectiveProjectStatus] ?? 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            {(effectiveProjectStatus === 'pending' || effectiveProjectStatus === 'on_hold'
-              ? awaitingLabel(project)
-              : statusBadgeLabel[effectiveProjectStatus]) ?? effectiveProjectStatus}
-          </span>
-
-          <h2 className="pr-20 text-base font-bold text-gray-900">{project.name}</h2>
-          <div className="mt-1 flex items-start gap-1">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 text-orange-500" />
-            <p className="text-xs text-gray-500">
-              {project.address}, {project.city}
-            </p>
+        <section className="mx-4 mt-2 overflow-hidden rounded-xl border border-[#E8DDD4] bg-white">
+          <div className="flex items-center gap-3 border-b border-[#E8DDD4] px-4 py-2.5">
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-sm font-bold text-[#2C2C2A]">{project.name}</h2>
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-1 w-16 overflow-hidden rounded-full bg-[#F2EDE8]">
+                  <div className="h-1 rounded-full bg-[#D85A30]" style={{ width: stageProgressWidth(project.current_stage) }} />
+                </div>
+                <p className="truncate text-[10px] capitalize text-[#A8A29E]">
+                  {project.current_stage} · {stageProgressPercent(project.current_stage)}%
+                </p>
+              </div>
+            </div>
+            <span className={`rounded-lg px-2 py-1 text-[9px] font-bold ${statusBadgeClass[effectiveProjectStatus] ?? 'bg-gray-100 text-gray-700'}`}>
+              {(effectiveProjectStatus === 'pending' || effectiveProjectStatus === 'on_hold'
+                ? awaitingLabel(project)
+                : statusBadgeLabel[effectiveProjectStatus]) ?? effectiveProjectStatus}
+            </span>
           </div>
-
-          {isCustomer && preferredProfessionalId ? (
+          <div className="border-b border-[#E8DDD4] bg-[#FBF0EB] px-4 py-2">
+            <div className="flex items-start gap-1">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 text-[#D85A30]" />
+              <p className="text-[11px] font-semibold text-[#D85A30]">{project.address}, {project.city}</p>
+            </div>
+            {isCustomer && preferredProfessionalId ? (
+              <Link
+                prefetch={false}
+                href={`/contractors/${preferredProfessionalId}?projectId=${project.id}`}
+                className="mt-1 inline-flex text-[11px] font-bold text-[#D85A30]"
+              >
+                {preferredProfessionalRole === 'worker' ? 'Worker' : 'Contractor'}: {resolvedProfessionalName ?? 'View profile'} (Tap to view profile/review)
+              </Link>
+            ) : null}
+          </div>
+          <div className="flex gap-2 border-b border-[#E8DDD4] px-4 py-2">
             <Link
-              prefetch={false}
-              href={`/contractors/${preferredProfessionalId}?projectId=${project.id}`}
-              className="mt-2.5 inline-flex rounded-md bg-orange-50 px-2.5 py-1.5 text-xs font-semibold text-orange-600"
+              href={`/projects/${project.id}/images`}
+              className="inline-flex items-center gap-1 rounded-md bg-[#2C2C2A] px-3 py-1.5 text-[11px] font-bold text-white"
             >
-              {preferredProfessionalRole === 'worker' ? 'Worker' : 'Contractor'}:{' '}
-              {resolvedProfessionalName ?? 'View profile'} (Profile & Review)
+              <span>📸</span>
+              <span>View Images</span>
             </Link>
-          ) : null}
-          <Link
-            href={`/projects/${project.id}/images`}
-            className="mt-2.5 inline-flex rounded-md bg-[#D85A30] px-3 py-2 text-xs font-bold text-white hover:bg-orange-600"
-          >
-            View Project Images
-          </Link>
-          <Link
-            href={`/projects/${project.id}/overview`}
-            className="mt-2.5 ml-2 inline-flex rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100"
-          >
-            Project Overview
-          </Link>
+            <Link
+              href={`/projects/${project.id}/overview`}
+              className="inline-flex items-center gap-1 rounded-md border border-[#F5DDD4] bg-[#FBF0EB] px-3 py-1.5 text-[11px] font-bold text-[#D85A30]"
+            >
+              <span>📋</span>
+              <span>Overview</span>
+            </Link>
+          </div>
         </section>
 
         {isCustomer && project.status === 'cancelled' ? (

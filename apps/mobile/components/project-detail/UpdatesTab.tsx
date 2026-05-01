@@ -7,7 +7,6 @@ import {
   Modal,
   Platform,
   RefreshControl,
-  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -24,13 +23,23 @@ import type { DetailTab, FeedbackState, UpdateItem } from '@/components/project-
 
 const BRAND = '#D85A30'
 
-const STAGE_BG: Record<string, string> = {
-  foundation: '#F1F5F9',
-  plinth: '#DBEAFE',
-  walls: '#FEF3C7',
-  slab: '#FFEDD5',
-  plastering: '#EDE9FE',
-  finishing: '#D1FAE5',
+function formatDateEntry(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+function stageEmoji(stage: string): string {
+  const map: Record<string, string> = {
+    foundation: '⛏️',
+    plinth: '🏗️',
+    walls: '🧱',
+    slab: '🪨',
+    plastering: '🖌️',
+    finishing: '✨',
+  }
+  return map[stage] ?? '🏗️'
 }
 
 type UpdatesTabProps = {
@@ -365,87 +374,146 @@ export function UpdatesTab({
           }
           const u = item.item
           const fb = feedbackByUpdate[u.id]
-          const stageBg = STAGE_BG[u.stageTag] ?? '#F2EDE8'
           const isHighlighted = highlightedUpdateId === u.id
           return (
             <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
               <View
                 style={{
-                  borderRadius: 20,
-                  backgroundColor: isHighlighted ? '#FFF7ED' : '#FFFFFF',
+                  borderRadius: 16,
+                  backgroundColor: '#FFFFFF',
                   overflow: 'hidden',
-                  borderWidth: isHighlighted ? 2 : 1,
-                  borderColor: isHighlighted ? '#D85A30' : '#F2EDE8',
+                  borderWidth: isHighlighted ? 2 : 0.5,
+                  borderColor: isHighlighted ? '#D85A30' : '#E8DDD4',
                 }}
               >
-                {u.photoUrls[0] ? (
-                  <TouchableOpacity onPress={() => setViewer({ photos: u.photoUrls, index: 0 })} activeOpacity={0.9}>
-                    <Image source={{ uri: u.photoUrls[0] }} style={{ width: '100%', height: 220 }} resizeMode="cover" />
-                    <View style={{ position: 'absolute', right: 12, bottom: 12, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(0,0,0,0.45)' }}>
-                      <Text style={{ fontSize: 11, color: '#FFFFFF', fontWeight: '600' }}>
-                        {u.photoUrls.length} photo{u.photoUrls.length > 1 ? 's' : ''}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ) : null}
-                <View style={{ padding: 16 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
-                          backgroundColor: BRAND,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
-                          {getInitials(u.posterName || contractorName)}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>{u.posterName || contractorName}</Text>
-                        <Text style={{ fontSize: 11, color: '#9CA3AF' }}>Site update</Text>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 11, color: '#6B7280' }}>{relativeTime(u.createdAt)}</Text>
-                      {canPost && u.postedBy === currentUserId ? (
-                        <TouchableOpacity onPress={() => setDeleteTarget(u)} hitSlop={12}>
-                          <Text style={{ fontSize: 14, color: '#EF4444' }}>🗑</Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                  </View>
-                  <View style={{ marginTop: 8, alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: stageBg }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
-                      {u.stageTag.charAt(0).toUpperCase() + u.stageTag.slice(1)}
+                <View
+                  style={{
+                    backgroundColor: '#2C2C2A',
+                    paddingHorizontal: 14,
+                    paddingVertical: 9,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.85)' }}>
+                    {'📝 ' + formatDateEntry(u.createdAt)}
+                  </Text>
+                  <View style={{ backgroundColor: 'rgba(216,90,48,0.25)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '700', color: '#D85A30', textTransform: 'capitalize' }}>
+                      {stageEmoji(u.stageTag)} {u.stageTag}
                     </Text>
                   </View>
-                  <Text style={{ marginTop: 8, fontSize: 14, color: '#374151', lineHeight: 20 }}>{u.description}</Text>
-                  {u.photoUrls.length > 1 ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
-                      {u.photoUrls.slice(1).map((url, idx) => (
-                        <TouchableOpacity key={`${u.id}-p-${idx}`} onPress={() => setViewer({ photos: u.photoUrls, index: idx + 1 })}>
-                          <Image source={{ uri: url }} style={{ width: 90, height: 90, borderRadius: 12, marginRight: 8 }} resizeMode="cover" />
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
+                </View>
+                <View style={{ padding: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 50,
+                        backgroundColor: '#D85A30',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                        {getInitials(u.posterName || contractorName)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#2C2C2A' }}>{u.posterName || contractorName}</Text>
+                      <Text style={{ fontSize: 9, color: '#A8A29E', marginTop: 1 }}>
+                        Contractor · {relativeTime(u.createdAt)}
+                      </Text>
+                    </View>
+                    {canPost && u.postedBy === currentUserId ? (
+                      <TouchableOpacity onPress={() => setDeleteTarget(u)} hitSlop={12}>
+                        <Text style={{ fontSize: 14, color: '#EF4444' }}>🗑</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  {u.photoUrls.length > 0 ? (
+                    u.photoUrls.length === 1 ? (
+                      <TouchableOpacity
+                        onPress={() => setViewer({ photos: u.photoUrls, index: 0 })}
+                        style={{ height: 140, borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}
+                      >
+                        <Image source={{ uri: u.photoUrls[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
+                        {u.photoUrls.slice(0, 3).map((url, idx) => (
+                          <TouchableOpacity
+                            key={`${u.id}-p-${idx}`}
+                            onPress={() => setViewer({ photos: u.photoUrls, index: idx })}
+                            style={{ flex: 1, height: 80, borderRadius: 8, overflow: 'hidden' }}
+                          >
+                            <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                            {idx === 2 && u.photoUrls.length > 3 ? (
+                              <View
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  left: 0,
+                                  backgroundColor: 'rgba(0,0,0,0.5)',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>+{u.photoUrls.length - 3}</Text>
+                              </View>
+                            ) : null}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )
                   ) : null}
+                  <Text style={{ fontSize: 13, color: '#78716C', lineHeight: 20, fontStyle: 'italic' }}>&quot;{u.description}&quot;</Text>
                   {u.materialsUsed ? (
-                    <View style={{ marginTop: 10, borderRadius: 8, padding: 8, backgroundColor: '#F9FAFB' }}>
-                      <Text style={{ fontSize: 12, color: '#4B5563' }}>Materials: {u.materialsUsed}</Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        marginTop: 8,
+                        backgroundColor: '#F2EDE8',
+                        borderRadius: 8,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10 }}>🧱</Text>
+                      <Text style={{ fontSize: 10, color: '#78716C' }}>{u.materialsUsed}</Text>
                     </View>
                   ) : null}
-                  <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F2EDE8', paddingTop: 12 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      marginTop: 10,
+                      paddingTop: 10,
+                      borderTopWidth: 0.5,
+                      borderTopColor: '#F2EDE8',
+                    }}
+                  >
                     <TouchableOpacity onPress={() => void toggleLike(u.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ fontSize: 13, color: fb?.likedByCurrentUser ? '#EF4444' : '#6B7280' }}>♥</Text>
-                      <Text style={{ fontSize: 12, color: '#6B7280' }}>{fb?.likesCount ?? 0}</Text>
+                      <Text style={{ fontSize: 14 }}>{fb?.likedByCurrentUser ? '❤️' : '🤍'}</Text>
+                      <Text style={{ fontSize: 11, color: fb?.likedByCurrentUser ? '#D85A30' : '#A8A29E', fontWeight: '600' }}>
+                        {fb?.likesCount ?? 0}
+                      </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => setExpandedComments((prev) => ({ ...prev, [u.id]: !prev[u.id] }))}>
-                      <Text style={{ fontSize: 12, color: '#6B7280' }}>💬 {fb?.comments?.length ?? 0}</Text>
+                    <TouchableOpacity
+                      onPress={() => setExpandedComments((prev) => ({ ...prev, [u.id]: !prev[u.id] }))}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    >
+                      <Text style={{ fontSize: 14 }}>💬</Text>
+                      <Text style={{ fontSize: 11, color: '#A8A29E', fontWeight: '600' }}>
+                        {fb?.comments?.length ?? 0} comments
+                      </Text>
                     </TouchableOpacity>
                   </View>
                   {expandedComments[u.id] ? (

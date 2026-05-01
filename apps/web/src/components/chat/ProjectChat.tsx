@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { Check, MessageCircle, Paperclip, SendHorizontal, X } from 'lucide-react'
+import { Check, MessageCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 
@@ -273,7 +273,7 @@ export default function ProjectChat({
   const overLimitCount = input.length > 800
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#E8DDD4] bg-[#F2EDE8]">
       <div
         ref={messagesContainerRef}
         style={{ overflowAnchor: 'none' }}
@@ -308,16 +308,14 @@ export default function ProjectChat({
               <div key={message.id}>
                 {dateChanged ? (
                   <div className="my-3 text-center">
-                    <span className="mx-auto inline-flex rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-500">
+                  <span className="mx-auto inline-flex rounded-full bg-[#E8DDD4] px-3 py-1 text-[10px] text-[#78716C]">
                       {dateSeparatorLabel(message.createdAt)}
                     </span>
                   </div>
                 ) : null}
 
-                {showSender ? (
-                  <p className={`mb-1 text-xs text-gray-500 ${own ? 'mr-1 text-right' : 'ml-10'}`}>
-                    {own ? currentUserName : message.senderName}
-                  </p>
+                {!own && showSender ? (
+                  <p className="mb-1 ml-10 text-[10px] text-[#A8A29E]">{message.senderName}</p>
                 ) : null}
 
                 <div className={`flex items-end gap-2 ${own ? 'justify-end' : 'justify-start'}`}>
@@ -345,17 +343,17 @@ export default function ProjectChat({
                       </button>
                     ) : (
                       <div
-                        className={`rounded-2xl px-4 py-2 text-sm ${
+                        className={`px-3.5 py-2.5 text-[13px] shadow-sm ${
                           own
-                            ? 'rounded-tr-sm bg-orange-500 text-white'
-                            : 'rounded-tl-sm border border-gray-100 bg-white text-gray-900 shadow-sm'
+                            ? 'rounded-tl-[18px] rounded-tr-[18px] rounded-bl-[18px] rounded-br-[2px] bg-[#D85A30] text-white shadow-[0_4px_12px_rgba(216,90,48,0.28)]'
+                            : 'rounded-tl-[18px] rounded-tr-[18px] rounded-bl-[2px] rounded-br-[18px] border border-[#E8DDD4] bg-white text-[#2C2C2A] shadow-[0_2px_8px_rgba(0,0,0,0.04)]'
                         }`}
                       >
                         {message.content}
                       </div>
                     )}
 
-                    <p className={`mt-1 text-[10px] ${own ? 'mr-1 text-orange-300' : 'ml-10 text-gray-400'}`}>
+                    <p className={`mt-1 text-[9px] ${own ? 'mr-1 text-[#A8A29E]' : 'ml-10 text-[#A8A29E]'}`}>
                       {formatMessageTime(message.createdAt)}
                       {own ? (
                         <span className="ml-1 inline-flex items-center text-orange-200">
@@ -388,7 +386,7 @@ export default function ProjectChat({
         </div>
       ) : null}
 
-      <div className="sticky bottom-0 border-t border-gray-100 bg-white p-3">
+      <div className="sticky bottom-0 border-t border-[#E8DDD4] bg-white p-2">
         <div className="w-full">
           {overLimitCount ? (
             <p className="mb-1 text-right text-xs text-gray-400">{input.length}/1000</p>
@@ -398,10 +396,10 @@ export default function ProjectChat({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingImage}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F2EDE8] text-[#78716C]"
               aria-label="Attach image"
             >
-              <Paperclip className="h-4 w-4" />
+              <span className="text-base">📎</span>
             </button>
             <input
               ref={fileInputRef}
@@ -421,18 +419,18 @@ export default function ProjectChat({
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleInputKeyDown}
               placeholder="Message..."
-              className="max-h-24 min-h-10 flex-1 resize-none rounded-2xl border-none bg-gray-100 px-4 py-2.5 text-sm outline-none"
+              className="max-h-24 min-h-10 flex-1 resize-none rounded-2xl border-none bg-[#F2EDE8] px-4 py-2.5 text-[13px] text-[#2C2C2A] outline-none"
             />
             <button
               type="button"
               onClick={() => void sendTextMessage()}
               disabled={!input.trim() || sending}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                !input.trim() || sending ? 'bg-gray-300' : 'bg-orange-500'
+              className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full ${
+                !input.trim() || sending ? 'bg-gray-300' : 'bg-[#D85A30] shadow-[0_4px_10px_rgba(216,90,48,0.35)]'
               } text-white`}
               aria-label="Send"
             >
-              <SendHorizontal className="h-[18px] w-[18px]" />
+              <span className="text-base">→</span>
             </button>
           </div>
         </div>

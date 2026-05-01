@@ -256,7 +256,7 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
     Platform.OS === 'ios' ? (keyboardHeight > 0 ? keyboardHeight : insets.bottom) : insets.bottom
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#F2EDE8' }}>
       {chrome}
       <FlatList
         ref={listRef}
@@ -282,14 +282,14 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
             <View>
               {dateChanged ? (
                 <View style={{ alignItems: 'center', marginVertical: 10 }}>
-                  <View style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4, backgroundColor: '#E5E7EB' }}>
-                    <Text style={{ fontSize: 11, color: '#6B7280' }}>{chatDateSeparatorLabel(message.createdAt)}</Text>
+                  <View style={{ borderRadius: 20, paddingHorizontal: 12, paddingVertical: 3, backgroundColor: '#E8DDD4' }}>
+                    <Text style={{ fontSize: 10, color: '#78716C' }}>{chatDateSeparatorLabel(message.createdAt)}</Text>
                   </View>
                 </View>
               ) : null}
-              {showSender ? (
-                <Text style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4, marginLeft: own ? 0 : 36, textAlign: own ? 'right' : 'left' }}>
-                  {own ? currentUserName : message.senderName}
+              {!own && showSender ? (
+                <Text style={{ fontSize: 10, color: '#A8A29E', marginBottom: 3, marginLeft: 36, textAlign: 'left' }}>
+                  {message.senderName}
                 </Text>
               ) : null}
               <View style={{ flexDirection: 'row', justifyContent: own ? 'flex-end' : 'flex-start', marginBottom: 8, alignItems: 'flex-end' }}>
@@ -308,18 +308,28 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
                   ) : (
                     <View
                       style={{
-                        borderRadius: 18,
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
+                        borderTopLeftRadius: 18,
+                        borderTopRightRadius: 18,
+                        borderBottomRightRadius: own ? 2 : 18,
+                        borderBottomLeftRadius: own ? 18 : 2,
+                        paddingHorizontal: 13,
+                        paddingVertical: 9,
                         backgroundColor: own ? BRAND : '#FFFFFF',
-                        borderWidth: own ? 0 : 1,
-                        borderColor: '#F2EDE8',
+                        borderWidth: own ? 0 : 0.5,
+                        borderColor: '#E8DDD4',
+                        shadowColor: own ? '#D85A30' : '#000000',
+                        shadowOpacity: own ? 0.3 : 0.04,
+                        shadowRadius: own ? 8 : 4,
+                        shadowOffset: { width: 0, height: 2 },
+                        elevation: own ? 2 : 1,
                       }}
                     >
-                      <Text style={{ fontSize: 14, color: own ? '#FFFFFF' : '#111827' }}>{message.content}</Text>
+                      <Text style={{ fontSize: 13, color: own ? '#FFFFFF' : '#2C2C2A' }}>{message.content}</Text>
                     </View>
                   )}
-                  <Text style={{ fontSize: 10, color: own ? '#FDBA74' : '#9CA3AF', marginTop: 4 }}>{formatMessageTime(message.createdAt)}</Text>
+                  <Text style={{ fontSize: 9, color: '#A8A29E', marginTop: 3, textAlign: own ? 'right' : 'left' }}>
+                    {formatMessageTime(message.createdAt)}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -328,19 +338,19 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
       />
       <View
         style={{
-          borderTopWidth: 1,
-          borderTopColor: '#F2EDE8',
+          borderTopWidth: 0.5,
+          borderTopColor: '#E8DDD4',
           backgroundColor: '#FFFFFF',
-          paddingHorizontal: 10,
-          paddingTop: 10,
+          paddingHorizontal: 8,
+          paddingTop: 8,
           paddingBottom: composerBottomPad,
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'center',
           gap: 8,
         }}
       >
-        <TouchableOpacity onPress={() => void uploadAndSendPhoto()} disabled={uploadingImage} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#F2EDE8', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 18 }}>📎</Text>
+        <TouchableOpacity onPress={() => void uploadAndSendPhoto()} disabled={uploadingImage} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F2EDE8', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 16 }}>📎</Text>
         </TouchableOpacity>
         <TextInput
           value={input}
@@ -348,21 +358,26 @@ export function ChatTab({ projectId, currentUserId, currentUserName, activeTab, 
           placeholder="Message…"
           maxLength={1000}
           multiline
-          style={{ flex: 1, minHeight: 48, maxHeight: 120, borderRadius: 20, backgroundColor: '#F2EDE8', paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 }}
+          style={{ flex: 1, minHeight: 40, maxHeight: 120, borderRadius: 20, backgroundColor: '#F2EDE8', paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, color: '#2C2C2A' }}
         />
         <TouchableOpacity
           onPress={() => void sendTextMessage()}
           disabled={!input.trim() || sending}
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: 24,
+            width: 38,
+            height: 38,
+            borderRadius: 19,
             backgroundColor: !input.trim() || sending ? '#D1D5DB' : BRAND,
             alignItems: 'center',
             justifyContent: 'center',
+            shadowColor: '#D85A30',
+            shadowOpacity: !input.trim() || sending ? 0 : 0.35,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: !input.trim() || sending ? 0 : 2,
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontSize: 18 }}>➤</Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 16 }}>→</Text>
         </TouchableOpacity>
       </View>
       <Modal visible={Boolean(previewImage)} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>

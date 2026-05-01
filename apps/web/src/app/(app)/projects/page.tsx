@@ -3,24 +3,28 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import BottomNav from '@/components/shared/bottom-nav'
 
-const statusTabs = ['all', 'active', 'pending', 'completed'] as const
-type StatusTab = (typeof statusTabs)[number]
+type TabFilter = 'all' | 'active' | 'pending' | 'completed'
 
-const statusPillClass: Record<string, string> = {
-  on_hold: 'bg-yellow-100 text-yellow-800',
-  active: 'bg-green-100 text-green-700',
-  completed: 'bg-gray-100 text-gray-700',
-  cancelled: 'bg-red-100 text-red-700',
+const FILTERS: TabFilter[] = ['all', 'active', 'pending', 'completed']
+
+type ProjectRow = {
+  id: string
+  name: string
+  address: string
+  city: string
+  status: string
+  current_stage: string
+  customer_id: string
+  contractor_id: string | null
+  updated_at: string
+  contractorName?: string
+  workerName?: string
+  customerName?: string
 }
 
-const statusLabel: Record<string, string> = {
-  on_hold: 'Pending',
-  active: 'Active',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-}
+type MemberRow = { project_id: string; user_id: string; role: string | null }
 
-const stageProgress: Record<string, number> = {
+const STAGE_PROGRESS: Record<string, number> = {
   foundation: 10,
   plinth: 25,
   walls: 45,
@@ -29,21 +33,223 @@ const stageProgress: Record<string, number> = {
   finishing: 100,
 }
 
-const stagePillClass: Record<string, string> = {
-  foundation: 'bg-gray-100 text-gray-700',
-  plinth: 'bg-blue-100 text-blue-700',
-  walls: 'bg-amber-100 text-amber-700',
-  slab: 'bg-orange-100 text-orange-700',
-  plastering: 'bg-purple-100 text-purple-700',
-  finishing: 'bg-green-100 text-green-700',
+const STATUS_CONFIG: Record<string, { label: string }> = {
+  pending: { label: 'Awaiting Contractor' },
+  on_hold: { label: 'Awaiting Contractor' },
+  active: { label: 'In Progress' },
+  completed: { label: 'Completed' },
+  cancelled: { label: 'Cancelled' },
 }
 
-function daysAgoText(dateValue?: string) {
-  if (!dateValue) return 'No updates yet'
-  const now = Date.now()
-  const then = new Date(dateValue).getTime()
-  const diffDays = Math.max(0, Math.floor((now - then) / (1000 * 60 * 60 * 24)))
-  return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+function awaitingLabel(project: ProjectRow) {
+  return project.contractor_id ? 'Waiting contractor approval' : 'Waiting worker approval'
+}
+
+type GradientStop = { from: string; mid: string; to: string }
+
+const STAGE_GRADIENTS: Record<string, GradientStop> = {
+  foundation: { from: '#4A3828', mid: '#6B4A30', to: '#8C6040' },
+  plinth: { from: '#1A2744', mid: '#1E3A5F', to: '#2563EB' },
+  walls: { from: '#3D2A10', mid: '#7C4A14', to: '#B45309' },
+  slab: { from: '#2D1B4E', mid: '#4C2D7A', to: '#7C3AED' },
+  plastering: { from: '#0D2A2A', mid: '#1A4A3A', to: '#0D9488' },
+  finishing: { from: '#14291A', mid: '#1A4A28', to: '#16A34A' },
+}
+
+const DEFAULT_GRADIENT: GradientStop = {
+  from: '#2C2C2A',
+  mid: '#3D2A20',
+  to: '#D85A30',
+}
+
+const STAGE_EMOJI: Record<string, string> = {
+  foundation: '⛏️',
+  plinth: '🏗️',
+  walls: '🧱',
+  slab: '🪨',
+  plastering: '🖌️',
+  finishing: '✨',
+}
+
+const STATUS_DOT: Record<string, string> = {
+  active: '#10B981',
+  pending: '#F59E0B',
+  on_hold: '#F59E0B',
+  completed: '#A8A29E',
+  cancelled: '#EF4444',
+}
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const days = Math.floor(diff / 86400000)
+  if (days === 0) return '0 days ago'
+  if (days === 1) return '1 day ago'
+  return `${days} days ago`
+}
+
+async function attachContractorNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectList: ProjectRow[]
+): Promise<ProjectRow[]> {
+  const contractorIds = Array.from(
+    new Set(projectList.map((p) => p.contractor_id).filter(Boolean) as string[])
+  )
+  if (contractorIds.length === 0) return projectList
+  const { data: contractorUsers } = await supabase.from('users').select('id,name').in('id', contractorIds)
+  const rows = (contractorUsers ?? []) as Array<{ id: string; name: string }>
+  const nameById = new Map(rows.map((u) => [u.id, u.name]))
+  return projectList.map((p) => ({
+    ...p,
+    contractorName: p.contractor_id ? (nameById.get(p.contractor_id) ?? undefined) : undefined,
+  }))
+}
+
+async function attachWorkerNamesWhenNoContractor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectList: ProjectRow[],
+  memberRows: MemberRow[]
+): Promise<ProjectRow[]> {
+  const needsWorker = new Set(projectList.filter((p) => !p.contractor_id).map((p) => p.id))
+  const workerIdByProject = new Map<string, string>()
+  for (const row of memberRows) {
+    if (row.role !== 'worker' || !needsWorker.has(row.project_id)) continue
+    if (!workerIdByProject.has(row.project_id)) workerIdByProject.set(row.project_id, row.user_id)
+  }
+  const workerIds = Array.from(new Set(workerIdByProject.values()))
+  if (workerIds.length === 0) return projectList
+  const { data: workerUsers } = await supabase.from('users').select('id,name').in('id', workerIds)
+  const nameById = new Map((workerUsers ?? []).map((u) => [u.id as string, u.name as string]))
+  return projectList.map((p) => {
+    if (p.contractor_id) return p
+    const wid = workerIdByProject.get(p.id)
+    const workerName = wid ? nameById.get(wid) : undefined
+    return workerName ? { ...p, workerName } : p
+  })
+}
+
+async function attachCustomerNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectList: ProjectRow[]
+): Promise<ProjectRow[]> {
+  const customerIds = Array.from(new Set(projectList.map((p) => p.customer_id).filter(Boolean)))
+  if (customerIds.length === 0) return projectList
+  const { data: customerUsers } = await supabase.from('users').select('id,name').in('id', customerIds)
+  const rows = (customerUsers ?? []) as Array<{ id: string; name: string }>
+  const nameById = new Map(rows.map((u) => [u.id, u.name]))
+  return projectList.map((p) => ({
+    ...p,
+    customerName: nameById.get(p.customer_id) ?? undefined,
+  }))
+}
+
+function titleRowParty(item: ProjectRow, isCustomer: boolean): { emoji: string; name: string } | null {
+  if (isCustomer) {
+    if (item.contractorName) return { emoji: '👷', name: item.contractorName }
+    if (item.workerName) return { emoji: '🛠️', name: item.workerName }
+    return null
+  }
+  if (item.customerName) return { emoji: '👤', name: item.customerName }
+  return null
+}
+
+function effectiveStatusForProject(
+  project: ProjectRow,
+  isCustomer: boolean,
+  projectHasAcceptedProfessional: Map<string, boolean>
+): string {
+  return (project.status === 'pending' || project.status === 'on_hold') &&
+    (!isCustomer || projectHasAcceptedProfessional.get(project.id) === true)
+    ? 'active'
+    : project.status
+}
+
+function filterMatchesTab(
+  project: ProjectRow,
+  tab: TabFilter,
+  isCustomer: boolean,
+  projectHasAcceptedProfessional: Map<string, boolean>
+): boolean {
+  if (tab === 'all') return true
+  const eff = effectiveStatusForProject(project, isCustomer, projectHasAcceptedProfessional)
+  if (tab === 'pending') return eff === 'pending' || eff === 'on_hold'
+  return eff === tab
+}
+
+function ProjectHeroCard({
+  project,
+  isCustomer,
+  projectHasAcceptedProfessional,
+}: {
+  project: ProjectRow
+  isCustomer: boolean
+  projectHasAcceptedProfessional: Map<string, boolean>
+}) {
+  const effectiveStatus = effectiveStatusForProject(project, isCustomer, projectHasAcceptedProfessional)
+  const statusCfg = STATUS_CONFIG[effectiveStatus] ?? STATUS_CONFIG.active
+  const statusLabel =
+    effectiveStatus === 'pending' || effectiveStatus === 'on_hold' ? awaitingLabel(project) : statusCfg.label
+
+  const progress = STAGE_PROGRESS[project.current_stage] ?? 10
+  const grad = STAGE_GRADIENTS[project.current_stage] ?? DEFAULT_GRADIENT
+  const stageLabel = project.current_stage.charAt(0).toUpperCase() + project.current_stage.slice(1)
+  const stageEmoji = STAGE_EMOJI[project.current_stage] ?? '🏗️'
+  const dotColor = STATUS_DOT[effectiveStatus] ?? '#A8A29E'
+  const party = titleRowParty(project, isCustomer)
+
+  const gradientCss = `linear-gradient(135deg, ${grad.from} 0%, ${grad.mid} 50%, ${grad.to} 100%)`
+
+  return (
+    <Link
+      href={`/projects/${project.id}`}
+      className="mb-3 block h-[158px] overflow-hidden rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.18)] transition-transform hover:scale-[1.01] active:opacity-90"
+    >
+      <div className="relative h-full w-full" style={{ background: gradientCss }}>
+        <div className="pointer-events-none absolute inset-0 bg-black/[0.28]" />
+        <div className="relative z-10 flex h-full flex-col p-3.5">
+          <div className="mb-auto flex justify-end">
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-white/30 px-2.5 py-1 text-[10px] font-bold text-white"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+            >
+              <span>{stageEmoji}</span>
+              {stageLabel}
+            </span>
+          </div>
+
+          <div className="mt-auto flex min-h-0 flex-col">
+            <div className="mb-0.5 flex min-w-0 items-center gap-2">
+              <h2 className="min-w-0 flex-1 truncate text-lg font-extrabold tracking-tight text-white">{project.name}</h2>
+              {party ? (
+                <span className="max-w-[152px] shrink-0 truncate text-right text-[11px] font-bold text-white/95">
+                  {party.emoji} {party.name}
+                </span>
+              ) : null}
+            </div>
+
+            <p className="mb-2.5 text-[11px] text-white/70">📍 {project.city}</p>
+
+            <div className="mb-2.5 flex items-center gap-2">
+              <div className="h-1 flex-1 overflow-hidden rounded-sm bg-white/20">
+                <div className="h-full rounded-sm bg-white" style={{ width: `${progress}%` }} />
+              </div>
+              <span className="min-w-[32px] text-[11px] font-bold text-white/90">{progress}%</span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold text-white"
+                style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
+                {statusLabel}
+              </span>
+              <span className="text-[10px] text-white/60">{relativeTime(project.updated_at)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  )
 }
 
 export default async function ProjectsPage({
@@ -61,271 +267,185 @@ export default async function ProjectsPage({
   if (!profile) redirect('/register')
 
   const query = await searchParams
-  const tab = statusTabs.includes((query.status ?? 'all') as StatusTab)
-    ? ((query.status ?? 'all') as StatusTab)
+  const tab = FILTERS.includes((query.status ?? 'all') as TabFilter)
+    ? ((query.status ?? 'all') as TabFilter)
     : 'all'
 
-  let projects:
-    | Array<{
-        id: string
-        name: string
-        address: string
-        city: string
-        status: string
-        current_stage: string
-      }>
-    = []
+  const isCustomer = profile.role === 'customer'
+
+  let projects: ProjectRow[] = []
+  let memberRows: MemberRow[] = []
 
   if (profile.role === 'customer') {
-    const response = await supabase
+    const { data: owned } = await supabase
       .from('projects')
-      .select('id,name,address,city,status,current_stage,created_at')
+      .select('id,name,address,city,status,current_stage,customer_id,contractor_id,updated_at')
       .eq('customer_id', user.id)
-      .order('created_at', { ascending: false })
-    const ownedProjects = (response.data ?? []) as typeof projects
-    const projectIds = ownedProjects.map((project) => project.id)
+      .order('updated_at', { ascending: false })
+    const ownedProjects = (owned ?? []) as ProjectRow[]
+    const projectIds = ownedProjects.map((p) => p.id)
+    let approvedProjects = ownedProjects
     if (projectIds.length > 0) {
-      const { data: ownedWithContractor } = await supabase
-        .from('projects')
-        .select('id,contractor_id')
-        .in('id', projectIds)
-      const contractorByProject = new Map((ownedWithContractor ?? []).map((p) => [p.id, p.contractor_id]))
       const { data: members } = await supabase
         .from('project_members')
         .select('project_id,user_id,role')
         .in('project_id', projectIds)
-      const memberRows = (members ?? []) as Array<{ project_id: string; user_id: string; role: string | null }>
-      projects = ownedProjects.filter((project) => {
-        const contractorId = contractorByProject.get(project.id) ?? null
-        if (contractorId) return memberRows.some((m) => m.project_id === project.id && m.user_id === contractorId)
+      memberRows = (members ?? []) as MemberRow[]
+      const acceptedProfessionalMap = new Map<string, boolean>()
+      for (const member of memberRows) {
+        if (member.user_id !== user.id && (member.role === 'worker' || member.role === 'contractor')) {
+          acceptedProfessionalMap.set(member.project_id, true)
+        }
+      }
+      approvedProjects = ownedProjects.filter((project) => {
+        if (project.contractor_id) {
+          return memberRows.some((m) => m.project_id === project.id && m.user_id === project.contractor_id)
+        }
         return memberRows.some((m) => m.project_id === project.id && m.role === 'worker')
       })
+      projects = await attachContractorNames(supabase, approvedProjects)
+      projects = await attachWorkerNamesWhenNoContractor(supabase, projects, memberRows)
     } else {
       projects = []
     }
   } else if (profile.role === 'contractor') {
-    const response = await supabase
+    const { data: proj } = await supabase
       .from('projects')
-      .select('id,name,address,city,status,current_stage,created_at')
+      .select('id,name,address,city,status,current_stage,customer_id,contractor_id,updated_at')
       .eq('contractor_id', user.id)
-      .order('created_at', { ascending: false })
-    projects = (response.data ?? []) as typeof projects
+      .in('status', ['active', 'completed'])
+      .order('updated_at', { ascending: false })
+    const contractorProjects = (proj ?? []) as ProjectRow[]
+    projects = await attachCustomerNames(supabase, contractorProjects)
   } else {
-    const { data: memberships } = await supabase
-      .from('project_members')
-      .select('project_id')
-      .eq('user_id', user.id)
-    const ids = Array.from(new Set((memberships ?? []).map((m) => m.project_id)))
+    const { data: mem } = await supabase.from('project_members').select('project_id').eq('user_id', user.id)
+    const ids = Array.from(new Set((mem ?? []).map((m) => m.project_id)))
     if (ids.length) {
-      const response = await supabase
+      const { data: proj } = await supabase
         .from('projects')
-        .select('id,name,address,city,status,current_stage,created_at')
+        .select('id,name,address,city,status,current_stage,customer_id,contractor_id,updated_at')
         .in('id', ids)
-        .order('created_at', { ascending: false })
-      projects = (response.data ?? []) as typeof projects
+        .order('updated_at', { ascending: false })
+      const workerProjects = (proj ?? []) as ProjectRow[]
+      projects = await attachCustomerNames(supabase, workerProjects)
     }
   }
 
-  const filteredProjects =
-    tab === 'all'
-      ? projects
-      : tab === 'pending'
-        ? projects.filter((project) => project.status === 'on_hold')
-        : projects.filter((project) => project.status === tab)
-
-  const ids = filteredProjects.map((project) => project.id)
-  const { data: workerMembers } = ids.length
-    ? await supabase.from('project_members').select('project_id').in('project_id', ids).eq('role', 'worker')
-    : { data: [] as Array<{ project_id: string }> }
-  const workerProjectSet = new Set((workerMembers ?? []).map((member) => member.project_id))
-  const { data: updates } = ids.length
-    ? await supabase
-        .from('daily_updates')
-        .select('project_id,created_at')
-        .in('project_id', ids)
-        .order('created_at', { ascending: false })
-    : { data: [] as Array<{ project_id: string; created_at: string }> }
-  const latestUpdateByProject = new Map<string, string>()
-  for (const update of updates ?? []) {
-    if (!latestUpdateByProject.has(update.project_id)) latestUpdateByProject.set(update.project_id, update.created_at)
+  const projectHasAcceptedProfessional = new Map<string, boolean>()
+  if (profile.role === 'customer' && memberRows.length > 0) {
+    for (const member of memberRows) {
+      if (member.user_id !== user.id && (member.role === 'worker' || member.role === 'contractor')) {
+        projectHasAcceptedProfessional.set(member.project_id, true)
+      }
+    }
+  } else if (!isCustomer && projects.length > 0) {
+    for (const p of projects) projectHasAcceptedProfessional.set(p.id, true)
   }
 
-  const emptyMessage =
-    tab === 'all'
-      ? 'No projects yet. Start by creating one.'
-      : tab === 'active'
-        ? 'No active projects.'
-        : tab === 'pending'
-          ? 'No pending invitations.'
-          : 'No completed projects yet.'
+  const filteredProjects = projects.filter((p) =>
+    filterMatchesTab(p, tab, isCustomer, projectHasAcceptedProfessional)
+  )
 
-  const getStatusBarColor = (status: string) => {
-    if (status === 'on_hold') return '#F59E0B'
-    if (status === 'active') return '#10B981'
-    if (status === 'completed') return '#6B7280'
-    if (status === 'cancelled') return '#EF4444'
-    return '#E0D5CC'
-  }
+  const countForTab = (item: TabFilter) =>
+    projects.filter((p) => filterMatchesTab(p, item, isCustomer, projectHasAcceptedProfessional)).length
 
   return (
-    <div className="min-h-screen px-4 py-5 pb-28" style={{ backgroundColor: '#F2EDE8' }}>
-      <div className="mx-auto w-full max-w-md">
-        <header className="mb-5">
-          <h1 className="text-2xl font-bold" style={{ color: '#1A1A1A' }}>
-            My Projects
-          </h1>
-        </header>
-
-        {/* Filter Tabs */}
-        <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
-          {statusTabs.map((item) => {
-            const active = tab === item
-            return (
-              <Link
-                key={item}
-                href={`/projects?status=${item}`}
-                className="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all"
-                style={{
-                  backgroundColor: active ? '#D85A30' : 'white',
-                  color: active ? 'white' : '#7A6F66',
-                  border: active ? 'none' : '2px solid #E0D5CC',
-                }}
-              >
-                {item[0].toUpperCase() + item.slice(1)}
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Project Cards or Empty State */}
-        {filteredProjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-lg bg-white py-12 px-6" style={{ minHeight: '300px' }}>
-            <svg
-              className="h-16 w-16 mb-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              style={{ color: '#E0D5CC' }}
-            >
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-            <h2 className="text-lg font-bold text-center" style={{ color: '#1A1A1A' }}>
-              {tab === 'all' ? 'No projects yet' : `No ${tab} projects`}
-            </h2>
-            <p className="mt-2 text-sm text-center" style={{ color: '#7A6F66' }}>
-              {emptyMessage}
-            </p>
-            {tab === 'all' && profile.role === 'customer' ? (
-              <Link
-                href="/projects/new"
-                className="mt-4 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#D85A30' }}
-              >
-                Create Your First Project
-              </Link>
-            ) : null}
+    <div className="min-h-screen px-3.5 pb-28 pt-3.5" style={{ backgroundColor: '#F2EDE8' }}>
+      <div className="mx-auto w-full max-w-lg">
+        <header className="mb-3.5">
+          <div className="mb-3 flex items-end justify-between">
+            <div>
+              <h1 className="text-[26px] font-extrabold tracking-tight" style={{ color: '#2C2C2A' }}>
+                My Projects
+              </h1>
+              <p className="mt-0.5 text-xs" style={{ color: '#A8A29E' }}>
+                {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredProjects.map((project) => {
-              const effectiveStatus =
-                (project.status === 'pending' || project.status === 'on_hold') && profile.role !== 'customer'
-                  ? 'active'
-                  : project.status
-              const progress = stageProgress[project.current_stage] ?? 0
-              const statusBarColor = getStatusBarColor(effectiveStatus)
-              const hideStagePill = workerProjectSet.has(project.id)
+
+          <div className="-mx-0.5 flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
+            {FILTERS.map((item) => {
+              const active = tab === item
+              const count = countForTab(item)
+              const href = `/projects?status=${item}`
               return (
                 <Link
-                  href={`/projects/${project.id}`}
-                  key={project.id}
-                  className="block rounded-lg bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                  key={item}
+                  href={href}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition-colors"
                   style={{
-                    borderLeft: `4px solid ${statusBarColor}`,
+                    backgroundColor: active ? '#2C2C2A' : '#FFFFFF',
+                    borderColor: active ? '#2C2C2A' : '#E8DDD4',
+                    color: active ? '#FFFFFF' : '#78716C',
                   }}
                 >
-                  <div className="p-4">
-                    {/* Project Name */}
-                    <h2 className="text-base font-bold" style={{ color: '#1A1A1A' }}>
-                      {project.name}
-                    </h2>
-
-                    {/* Address with Icon */}
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <svg
-                        className="h-4 w-4 flex-shrink-0"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        style={{ color: '#7A6F66' }}
-                      >
-                        <path d="M12 2C7.6 2 4 5.6 4 10c0 5.1 8 12 8 12s8-6.9 8-12c0-4.4-3.6-8-8-8z" />
-                      </svg>
-                      <p className="text-xs font-medium" style={{ color: '#7A6F66' }}>
-                        {project.address}, {project.city}
-                      </p>
-                    </div>
-
-                    {/* Stage Pill */}
-                    {!hideStagePill ? (
-                      <div className="mt-3 flex gap-2">
-                        <span
-                          className="rounded-full px-2.5 py-1 text-xs font-semibold"
-                          style={{
-                            backgroundColor: stagePillClass[project.current_stage]?.includes('bg-') 
-                              ? '#FFF8F5' 
-                              : '#E0D5CC',
-                            color: '#D85A30',
-                          }}
-                        >
-                          {project.current_stage.charAt(0).toUpperCase() + project.current_stage.slice(1)}
-                        </span>
-                      </div>
-                    ) : null}
-
-                    {/* Progress Bar */}
-                    <div className="mt-4">
-                      <div className="h-1 rounded-full" style={{ backgroundColor: '#E0D5CC' }}>
-                        <div
-                          className="h-1 rounded-full transition-all"
-                          style={{ width: `${progress}%`, backgroundColor: '#D85A30' }}
-                        />
-                      </div>
-                      <p className="mt-2 text-xs font-medium" style={{ color: '#7A6F66' }}>
-                        {progress}% complete
-                      </p>
-                    </div>
-
-                    {/* Bottom Row: Contractor/Customer and Time */}
-                    <div className="mt-3 flex items-center justify-between">
-                      <p className="text-xs font-medium" style={{ color: '#1A1A1A' }}>
-                        {profile.role === 'customer' ? 'Contractor:' : 'Customer:'}{' '}
-                        <span style={{ color: '#7A6F66' }}>Assigned</span>
-                      </p>
-                      <p className="text-xs font-medium" style={{ color: '#999' }}>
-                        {daysAgoText(latestUpdateByProject.get(project.id))}
-                      </p>
-                    </div>
-                  </div>
+                  {item.charAt(0).toUpperCase() + item.slice(1)}
+                  {count > 0 ? (
+                    <span
+                      className="min-w-[18px] rounded-[10px] px-1 py-px text-center text-[9px] font-bold"
+                      style={{
+                        backgroundColor: active ? '#D85A30' : '#F2EDE8',
+                        color: active ? '#FFFFFF' : '#78716C',
+                      }}
+                    >
+                      {count}
+                    </span>
+                  ) : null}
                 </Link>
               )
             })}
           </div>
+        </header>
+
+        {filteredProjects.length === 0 ? (
+          <div className="flex flex-col items-center px-8 py-14">
+            <div
+              className="mb-3.5 flex h-[72px] w-[72px] items-center justify-center rounded-full text-[32px]"
+              style={{
+                background: 'linear-gradient(135deg, #2C2C2A 0%, #3D2A20 50%, #D85A30 100%)',
+              }}
+            >
+              🏗️
+            </div>
+            <h2 className="mb-2 text-lg font-extrabold" style={{ color: '#2C2C2A' }}>
+              No projects yet
+            </h2>
+            <p className="text-center text-[13px] leading-5" style={{ color: '#78716C' }}>
+              {isCustomer ? 'Tap + to create your first project' : 'You will see projects here once invited'}
+            </p>
+            {tab === 'all' && isCustomer ? (
+              <Link
+                href="/projects/new"
+                className="mt-4 rounded-xl px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#D85A30' }}
+              >
+                Create project
+              </Link>
+            ) : null}
+          </div>
+        ) : (
+          <div>
+            {filteredProjects.map((project) => (
+              <ProjectHeroCard
+                key={project.id}
+                project={project}
+                isCustomer={isCustomer}
+                projectHasAcceptedProfessional={projectHasAcceptedProfessional}
+              />
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Floating Action Button */}
-      {profile.role === 'customer' ? (
+      {isCustomer ? (
         <Link
           href="/projects/new"
-          className="fixed right-6 bottom-28 z-30 flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold text-white transition-transform hover:scale-110 shadow-lg"
+          className="fixed bottom-28 right-5 z-30 flex h-[58px] w-[58px] items-center justify-center rounded-full text-[30px] font-light leading-none text-white shadow-[0_4px_12px_rgba(216,90,48,0.45)] transition-transform hover:scale-105"
           style={{ backgroundColor: '#D85A30' }}
           aria-label="Create new project"
         >
-          +
+          <span className="-mt-0.5">+</span>
         </Link>
       ) : null}
 

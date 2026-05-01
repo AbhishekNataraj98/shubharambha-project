@@ -49,24 +49,62 @@ type PaymentsTabProps = {
   }
 }
 
-function modeLabel(mode: PaymentItem['paymentMode']): string {
-  if (mode === 'bank_transfer') return 'Bank Transfer'
-  return mode.toUpperCase()
-}
-
 function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function monthLabel(value: string): string {
   return new Date(value).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }).toUpperCase()
 }
 
-function categoryVisual(category: PaymentItem['paidToCategory']): { label: string; badge: string; bg: string; fg: string } {
-  if (category === 'labour') return { label: 'Labour Payment', badge: 'L', bg: '#DBEAFE', fg: '#2563EB' }
-  if (category === 'material') return { label: 'Material Payment', badge: 'M', bg: '#D1FAE5', fg: '#059669' }
-  if (category === 'contractor_fee') return { label: 'Contractor Payment', badge: 'C', bg: '#FFEDD5', fg: BRAND }
-  return { label: 'Other Payment', badge: 'O', bg: '#F2EDE8', fg: '#4B5563' }
+function statusAccentColor(status: string): string {
+  if (status === 'confirmed') return '#10B981'
+  if (status === 'pending_confirmation') return '#F59E0B'
+  if (status === 'declined' || status === 'rejected') return '#EF4444'
+  return '#E8DDD4'
+}
+
+function categoryEmoji(category: string): string {
+  const map: Record<string, string> = {
+    labour: '👷',
+    labor: '👷',
+    material: '🧱',
+    materials: '🧱',
+    contractor_fee: '🏗️',
+    other: '📦',
+  }
+  return map[category?.toLowerCase()] ?? '💳'
+}
+
+function categoryLabel(category: string): string {
+  const map: Record<string, string> = {
+    labour: 'Labour Payment',
+    labor: 'Labour Payment',
+    material: 'Material Payment',
+    contractor_fee: 'Contractor Payment',
+    other: 'Other Payment',
+  }
+  return map[category?.toLowerCase()] ?? 'Payment'
+}
+
+function statusIcon(status: string): string {
+  if (status === 'confirmed') return '✅'
+  if (status === 'pending_confirmation') return '⏳'
+  if (status === 'declined' || status === 'rejected') return '❌'
+  return '❓'
+}
+
+function statusLabel(status: string): string {
+  if (status === 'confirmed') return 'Confirmed'
+  if (status === 'pending_confirmation') return 'Waiting approval'
+  if (status === 'declined' || status === 'rejected') return 'Declined'
+  return status
+}
+
+function statusTextColor(status: string): string {
+  if (status === 'confirmed') return '#10B981'
+  if (status === 'pending_confirmation') return '#F59E0B'
+  return '#EF4444'
 }
 
 type MonthGroup = { month: string; items: PaymentItem[] }
@@ -259,22 +297,33 @@ export function PaymentsTab({
         activeTab={activeTab}
         onTabChange={onTabChange}
       />
-      <View style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#111827' }}>
-        <Text style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.8 }}>Total Paid</Text>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginTop: 2 }}>{formatINR(summary.confirmed)}</Text>
-        <View style={{ height: 1, backgroundColor: '#374151', marginVertical: 8 }} />
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View
+        style={{
+          backgroundColor: '#2C2C2A',
+          borderRadius: 16,
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          marginHorizontal: 16,
+          marginTop: 8,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 10, color: '#9CA3AF' }}>Confirmed</Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#34D399', marginTop: 2 }}>{formatINR(summary.confirmed)}</Text>
+            <Text style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.8, textTransform: 'uppercase' }}>TOTAL CONFIRMED</Text>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginTop: 1 }}>{formatINR(summary.confirmed)}</Text>
+            <Text style={{ fontSize: 7, color: '#10B981', marginTop: 1 }}>✓ {counts.confirmed} confirmed</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 10, color: '#9CA3AF' }}>Pending</Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#FBBF24', marginTop: 2 }}>{formatINR(summary.pending)}</Text>
+          <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#F59E0B' }}>{formatINR(summary.pending)}</Text>
+            <Text style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>Pending</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end', marginLeft: 10 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#EF4444' }}>{formatINR(summary.declined)}</Text>
+            <Text style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>Declined</Text>
           </View>
         </View>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8, marginBottom: 8, paddingHorizontal: 16 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 0, marginBottom: 8, paddingHorizontal: 16, paddingVertical: 8 }}>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {filterPills.map((pill) => {
             const active = filter === pill.id
@@ -286,16 +335,17 @@ export function PaymentsTab({
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 6,
-                  borderRadius: 999,
+                  borderRadius: 20,
                   paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  minHeight: 48,
-                  backgroundColor: active ? BRAND : '#F2EDE8',
+                  paddingVertical: 5,
+                  backgroundColor: active ? '#D85A30' : '#FFFFFF',
+                  borderWidth: active ? 0 : 0.5,
+                  borderColor: '#E8DDD4',
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#FFFFFF' : '#4B5563' }}>{pill.label}</Text>
-                <View style={{ borderRadius: 8, paddingHorizontal: 6, backgroundColor: active ? 'rgba(255,255,255,0.25)' : '#FFFFFF' }}>
-                  <Text style={{ fontSize: 11, color: active ? '#FFFFFF' : '#4B5563' }}>{pill.count}</Text>
+                <Text style={{ fontSize: 10, fontWeight: active ? '700' : '500', color: active ? '#FFFFFF' : '#78716C' }}>{pill.label}</Text>
+                <View style={{ borderRadius: 8, paddingHorizontal: 5, backgroundColor: active ? 'rgba(255,255,255,0.25)' : '#F2EDE8' }}>
+                  <Text style={{ fontSize: 10, color: active ? '#FFFFFF' : '#78716C' }}>{pill.count}</Text>
                 </View>
               </TouchableOpacity>
             )
@@ -348,7 +398,7 @@ export function PaymentsTab({
           }
           const payment = item.payment
           const normalizedStatus = payment.status === 'rejected' ? 'declined' : payment.status
-          const visual = categoryVisual(payment.paidToCategory)
+          const accentColor = statusAccentColor(payment.status)
           const professionalNeedsAction =
             (currentUserRole === 'contractor' || currentUserRole === 'worker') &&
             payment.status === 'pending_confirmation' &&
@@ -364,71 +414,96 @@ export function PaymentsTab({
                 ? 'contractor'
                 : 'professional'
 
-          const borderLeft = isPending ? (professionalNeedsAction ? BRAND : '#F59E0B') : isDeclined ? '#EF4444' : '#10B981'
-          const baseBg = isPending ? (professionalNeedsAction ? '#FFFFFF' : '#FFFBEB') : isDeclined ? '#FEF2F2' : '#FFFFFF'
-          const bg = isHighlighted ? '#FFF7ED' : baseBg
-
           return (
             <View
               style={{
                 marginHorizontal: 16,
-                marginBottom: 12,
-                borderRadius: 16,
-                borderLeftWidth: 4,
-                borderLeftColor: isHighlighted ? '#D85A30' : borderLeft,
-                backgroundColor: bg,
-                padding: 14,
-                borderWidth: isHighlighted ? 2 : professionalNeedsAction ? 2 : 1,
-                borderColor: isHighlighted ? '#D85A30' : professionalNeedsAction ? '#FDBA74' : '#F2EDE8',
+                marginBottom: 10,
+                borderRadius: 14,
+                backgroundColor: '#FFFFFF',
+                borderWidth: isHighlighted ? 2 : 0.5,
+                borderColor: isHighlighted ? '#D85A30' : '#E8DDD4',
+                overflow: 'hidden',
               }}
             >
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: visual.bg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontWeight: '800', color: visual.fg }}>{visual.badge}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', flex: 1 }}>{visual.label}</Text>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>{formatINR(payment.amount)}</Text>
+              <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: accentColor }} />
+              <View style={{ padding: 12, paddingLeft: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      backgroundColor: '#FBF0EB',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16 }}>{categoryEmoji(payment.paidToCategory)}</Text>
                   </View>
-                  <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
-                    {professionalNeedsAction ? `Recorded by: ${payment.recordedByName}` : `Paid to: ${payment.paidToName}`}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#6B7280' }}>
-                    Via: {modeLabel(payment.paymentMode)} · {formatDate(payment.paidAt)}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#2C2C2A' }} numberOfLines={1}>
+                      {categoryLabel(payment.paidToCategory)}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#A8A29E', marginTop: 2 }}>
+                      {payment.paidToName} · {payment.paymentMode?.toUpperCase()} · {formatDate(payment.paidAt)}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#2C2C2A' }}>{formatINR(payment.amount)}</Text>
+                </View>
                   {payment.description ? (
-                    <Text style={{ marginTop: 6, fontSize: 13, color: '#4B5563', fontStyle: 'italic' }}>&quot;{payment.description}&quot;</Text>
+                  <Text style={{ fontSize: 11, color: '#78716C', fontStyle: 'italic', marginTop: 8, paddingLeft: 46 }} numberOfLines={2}>
+                    &quot;{payment.description}&quot;
+                    </Text>
                   ) : null}
-                  {isPending && !professionalNeedsAction ? (
-                    <View style={{ marginTop: 10, borderRadius: 10, padding: 10, backgroundColor: '#FEF3C7' }}>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#92400E' }}>{`⏳ Waiting for ${pendingRoleLabel} approval`}</Text>
-                    </View>
-                  ) : null}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: 8,
+                    paddingTop: 8,
+                    borderTopWidth: 0.5,
+                    borderTopColor: '#F2EDE8',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ fontSize: 10 }}>{statusIcon(payment.status)}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: statusTextColor(payment.status) }}>
+                      {statusLabel(payment.status)}
+                    </Text>
+                  </View>
                   {professionalNeedsAction ? (
-                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
                       <TouchableOpacity
                         onPress={() => setConfirmApproveId(payment.id)}
                         disabled={actionLoadingId === payment.id}
-                        style={{ flex: 1, minHeight: 48, borderRadius: 12, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ minHeight: 34, borderRadius: 10, backgroundColor: '#10B981', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }}
                       >
-                        <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Approve</Text>
+                        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 11 }}>Approve</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => setConfirmDeclineId(payment.id)}
                         disabled={actionLoadingId === payment.id}
-                        style={{ flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ minHeight: 34, borderRadius: 10, borderWidth: 0.5, borderColor: '#FECACA', backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }}
                       >
-                        <Text style={{ color: '#DC2626', fontWeight: '700' }}>Decline</Text>
+                        <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 11 }}>Decline</Text>
                       </TouchableOpacity>
                     </View>
                   ) : null}
-                  {isConfirmed ? (
-                    <Text style={{ marginTop: 10, fontSize: 12, fontWeight: '600', color: '#059669' }}>✓ Confirmed</Text>
-                  ) : null}
-                  {isDeclined && currentUserRole === 'customer' ? (
+                </View>
+                {isPending && !professionalNeedsAction ? (
+                  <View style={{ marginTop: 8, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FEF3C7' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#92400E' }}>{`⏳ Waiting for ${pendingRoleLabel} approval`}</Text>
+                  </View>
+                ) : null}
+                {isConfirmed ? (
+                  <Text style={{ marginTop: 8, fontSize: 10, fontWeight: '600', color: '#059669' }}>Approved by {payment.paidToName}</Text>
+                ) : null}
+                {isDeclined && currentUserRole === 'customer' ? (
                     <View style={{ marginTop: 10 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#DC2626' }}>✗ Declined</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#DC2626' }}>✗ Declined</Text>
                       {payment.declineReason ? <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>Reason: {payment.declineReason}</Text> : null}
                       <TouchableOpacity
                         onPress={() => {
@@ -443,15 +518,14 @@ export function PaymentsTab({
                           })
                           setSheetOpen(true)
                         }}
-                        style={{ marginTop: 10, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB' }}
+                        style={{ marginTop: 10, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 0.5, borderColor: '#E5E7EB' }}
                       >
-                        <Text style={{ fontWeight: '600', color: '#374151' }}>Edit & Resubmit</Text>
+                        <Text style={{ fontWeight: '600', color: '#374151', fontSize: 11 }}>Edit & Resubmit</Text>
                       </TouchableOpacity>
                     </View>
                   ) : null}
                 </View>
               </View>
-            </View>
           )
         }}
       />

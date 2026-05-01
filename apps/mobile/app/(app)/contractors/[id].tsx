@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -137,6 +138,9 @@ export default function ContractorProfileScreen() {
   const [isEditingReview, setIsEditingReview] = useState(false)
   const [hasReviewLocked, setHasReviewLocked] = useState(false)
   const [showInviteLockedModal, setShowInviteLockedModal] = useState(false)
+  const [showCallConfirmModal, setShowCallConfirmModal] = useState(false)
+  const [callPromptText, setCallPromptText] = useState('')
+  const [callDialDigits, setCallDialDigits] = useState('')
   const [activeGalleryImageUri, setActiveGalleryImageUri] = useState<string | null>(null)
   const [reviewsY, setReviewsY] = useState(0)
   const scrollRef = useRef<ScrollView>(null)
@@ -352,6 +356,32 @@ export default function ContractorProfileScreen() {
     scrollRef.current?.scrollTo({ y: Math.max(reviewsY - 24, 0), animated: true })
   }
 
+  const callProfessional = async () => {
+    const roleLabel = data.role === 'worker' ? 'worker' : 'contractor'
+    const rawDigits = (data.phone_number ?? '').replace(/\D/g, '')
+    const dialDigits = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits
+
+    if (!dialDigits) {
+      Alert.alert('Phone unavailable', `No phone number found for this ${roleLabel}.`)
+      return
+    }
+
+    const roleTitle = data.role === 'worker' ? 'Worker' : 'Contractor'
+    setCallPromptText(`Call ${roleTitle}: ${data.name} now?`)
+    setCallDialDigits(dialDigits)
+    setShowCallConfirmModal(true)
+  }
+
+  const confirmCallProfessional = async () => {
+    const tel = `tel:${callDialDigits}`
+    const canOpen = await Linking.canOpenURL(tel)
+    if (!canOpen) {
+      Alert.alert('Cannot place call', 'Calling is not supported on this device.')
+      return
+    }
+    await Linking.openURL(tel)
+  }
+
   const heroCoverUri = data.professional_images[0]?.image_url ?? null
 
   return (
@@ -448,10 +478,47 @@ export default function ContractorProfileScreen() {
           </View>
         </View>
 
-        <View style={{ paddingHorizontal: 16, paddingVertical: 14, backgroundColor: CARD_BG, borderBottomWidth: 0.5, borderBottomColor: CARD_BORDER }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`📍 ${data.city ?? '—'} · ${data.pincode ?? '—'}`}</Text>
-          <Text style={{ marginTop: 10, fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`📞 ${formatPhoneIndian(data.phone_number)}`}</Text>
-          <Text style={{ marginTop: 10, fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`👷 ${data.years_experience} yrs experience`}</Text>
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            backgroundColor: CARD_BG,
+            borderBottomWidth: 0.5,
+            borderBottomColor: CARD_BORDER,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`📍 ${data.city ?? '—'} · ${data.pincode ?? '—'}`}</Text>
+              <Text style={{ marginTop: 10, fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`📞 ${formatPhoneIndian(data.phone_number)}`}</Text>
+              <Text style={{ marginTop: 10, fontSize: 15, fontWeight: '700', color: CHARCOAL, lineHeight: 22 }}>{`👷 ${data.years_experience} yrs experience`}</Text>
+            </View>
+            {showInviteBar ? (
+              <TouchableOpacity
+                onPress={() => void callProfessional()}
+                activeOpacity={0.9}
+                style={{
+                  minHeight: 52,
+                  minWidth: 52,
+                  width: 52,
+                  borderRadius: 26,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#16A34A',
+                  borderWidth: 1,
+                  borderColor: '#86EFAC',
+                  shadowColor: '#14532D',
+                  shadowOpacity: 0.28,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 3,
+                }}
+                accessibilityLabel={`Call ${data.name}`}
+              >
+                <Text style={{ fontSize: 22 }}>📞</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
@@ -860,6 +927,35 @@ export default function ContractorProfileScreen() {
                   }}
                 >
                   <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+      {showInviteBar ? (
+        <Modal visible={showCallConfirmModal} transparent animationType="fade" onRequestClose={() => setShowCallConfirmModal(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(17,24,39,0.45)', justifyContent: 'center', paddingHorizontal: 22 }}>
+            <View style={{ borderRadius: 18, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+              <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 14 }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#2C2C2A', lineHeight: 25 }}>{callPromptText}</Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: '#E8DDD4' }}>
+                <TouchableOpacity
+                  onPress={() => setShowCallConfirmModal(false)}
+                  style={{ flex: 1, minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRightWidth: 0.5, borderRightColor: '#E8DDD4' }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#78716C' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowCallConfirmModal(false)
+                    void confirmCallProfessional()
+                  }}
+                  style={{ flex: 1, minHeight: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: '#16A34A' }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>Call</Text>
                 </TouchableOpacity>
               </View>
             </View>

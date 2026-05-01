@@ -1,6 +1,6 @@
 export default function DashboardLoading() {
   return (
-    <div className="min-h-screen bg-white pb-24">
+    <div className="min-h-screen pb-24" style={{ backgroundColor: '#F2EDE8' }}>
       <div className="mx-auto w-full max-w-md px-4 py-5">
         <div className="flex items-center justify-between">
           <div className="h-9 w-36 animate-pulse rounded-lg bg-gray-200" />
